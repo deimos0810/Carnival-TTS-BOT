@@ -126,11 +126,63 @@ const value = new SlashCommandBuilder()
       .addBooleanOption((o) => o.setName('unob').setDescription('Chỉ xem bản Unobtainable (Unob)?')),
   )
   .addSubcommand((s) =>
+    s
+      .setName('trade')
+      .setDescription('So sánh kèo trade Win / Fair / Loss giữa các Unit / Gamepass')
+      .addStringOption((o) =>
+        o
+          .setName('give')
+          .setDescription('Món bạn đưa (vd: Piccolo Shiny, hoặc nhiều món cách nhau dấu phẩy)')
+          .setRequired(true)
+          .setAutocomplete(true),
+      )
+      .addStringOption((o) =>
+        o
+          .setName('get')
+          .setDescription('Món bạn nhận (vd: Thorfinn, hoặc Summer Bundle 1)')
+          .setRequired(true)
+          .setAutocomplete(true),
+      )
+      .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
+      .addStringOption((o) =>
+        o
+          .setName('lang')
+          .setDescription('Giọng đọc')
+          .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
+      ),
+  )
+  .addSubcommand((s) =>
     s.setName('info').setDescription('Xem thông tin bảng giá, link Google Sheet và thời gian cập nhật'),
   )
   .addSubcommand((s) =>
     s.setName('sync').setDescription('[Admin] Đồng bộ dữ liệu mới nhất trực tiếp từ Google Sheet'),
   );
 
-export const commandData = [tts, join, leave, skip, say, value].map((c) => c.toJSON());
+// Lệnh tắt /wfl để so sánh nhanh kèo trade
+const wfl = new SlashCommandBuilder()
+  .setName('wfl')
+  .setDescription('So sánh kèo trade Win / Fair / Loss (Unit, Gamepass, Skin, Relic)')
+  .addStringOption((o) =>
+    o
+      .setName('give')
+      .setDescription('Món bạn đưa (vd: Piccolo Shiny, hoặc nhiều món cách nhau dấu phẩy)')
+      .setRequired(true)
+      .setAutocomplete(true),
+  )
+  .addStringOption((o) =>
+    o
+      .setName('get')
+      .setDescription('Món bạn nhận (vd: Thorfinn, hoặc Summer Bundle 1)')
+      .setRequired(true)
+      .setAutocomplete(true),
+  )
+  .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
+  .addStringOption((o) =>
+    o
+      .setName('lang')
+      .setDescription('Giọng đọc')
+      .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
+  );
+
+export const commandData = [tts, join, leave, skip, say, value, wfl].map((c) => c.toJSON());
 export { PermissionFlagsBits };

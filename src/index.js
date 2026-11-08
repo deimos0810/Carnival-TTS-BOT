@@ -22,6 +22,13 @@ import {
   CATEGORIES,
   SHEET_URL,
 } from './values.js';
+import {
+  parseTradeItems,
+  evaluateTrade,
+  tradeEmbed,
+  tradeSpeech,
+  handleTradeAutocomplete,
+} from './trade.js';
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('Thiếu DISCORD_TOKEN trong biến môi trường!');
@@ -204,7 +211,12 @@ client.on(Events.InteractionCreate, async (i) => {
       case 'tts':
         return await handleTTS(i, cfg, member);
       case 'value':
+        if (i.options.getSubcommand() === 'trade') {
+          return await handleTradeCommand(i, member);
+        }
         return await handleValue(i, member);
+      case 'wfl':
+        return await handleTradeCommand(i, member);
     }
   } catch (e) {
     console.error('[cmd] Lỗi:', e);
@@ -446,8 +458,46 @@ async function handleValue(i, member) {
   }
 }
 
+async function handleTradeCommand(i, member) {
+  const giveStr = i.options.getString('give');
+  const getStr = i.options.getString('get');
+
+  const giveParsed = parseTradeItems(giveStr);
+  const getParsed = parseTradeItems(getStr);
+
+  const notFound = [...giveParsed.notFound, ...getParsed.notFound];
+
+  if (!giveParsed.items.length && !getParsed.items.length) {
+    return i.reply({
+      content: `❌ Không tìm thấy item hợp lệ nào trong kèo trade!\nKhông nhận diện được: ${notFound.map((s) => `\`${s}\``).join(', ')}`,
+      flags: ephemeral,
+    });
+  }
+
+  const result = evaluateTrade(giveParsed.items, getParsed.items);
+  await i.reply({ embeds: [tradeEmbed(result, notFound)] });
+
+  if (i.options.getBoolean('speak')) {
+    const vc = member.voice.channel;
+    if (!vc) {
+      return i.followUp({ content: '⚠️ Bạn hãy vào phòng voice để bot đọc kết quả trade.', flags: ephemeral });
+    }
+    const s = await joinChannel(vc);
+    const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
+    s.enqueue(tradeSpeech(result, lang), lang);
+  }
+}
+
 async function handleAutocomplete(i) {
-  const focused = i.options.getFocused();
+  const focusedOption = i.options.getFocused(true);
+
+  // Nếu đang gõ ở ô give hoặc get của kèo trade
+  if (focusedOption.name === 'give' || focusedOption.name === 'get') {
+    const choices = handleTradeAutocomplete(focusedOption.value);
+    return await i.respond(choices.slice(0, 25));
+  }
+
+  const focused = focusedOption.value;
   const choices = searchValues(focused, 25).map((it) => {
     const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
     const shiny = it.isShiny ? '✨' : '';
