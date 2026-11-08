@@ -1,15 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-/**
- * Lưu trữ đơn giản: toàn bộ state là 1 object.
- * - Có MONGODB_URI  -> lưu vào MongoDB (bền vững, khuyên dùng trên Render).
- * - Không có        -> lưu file data/state.json (Render free sẽ MẤT file khi restart/deploy).
- */
 const DATA_FILE = process.env.DATA_FILE || path.resolve('data/state.json');
-const SEED_DIR = path.resolve('data');
+const SEED_FILE = path.resolve('data/values.seed.json');
 
-const defaultState = () => ({ guilds: {}, users: {}, fruits: {}, submissions: [], nextSubmissionId: 1 });
+const defaultState = () => ({ guilds: {}, users: {}, values: {}, lastSync: null });
 
 export let state = defaultState();
 let mongoCol = null;
@@ -20,7 +15,7 @@ export async function initStore() {
     const { MongoClient } = await import('mongodb');
     const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    mongoCol = client.db(process.env.MONGODB_DB || 'gpo_tts_bot').collection('state');
+    mongoCol = client.db(process.env.MONGODB_DB || 'carnival_bot').collection('state');
     const doc = await mongoCol.findOne({ _id: 'state' });
     state = { ...defaultState(), ...(doc?.data ?? {}) };
     console.log('[store] Dùng MongoDB');
@@ -30,31 +25,24 @@ export async function initStore() {
     } catch {
       state = defaultState();
     }
-    console.log(`[store] Dùng file ${DATA_FILE} (không bền vững trên Render free!)`);
+    console.log(`[store] Dùng file ${DATA_FILE}`);
   }
 
-  // Nạp dữ liệu mặc định từ data/*.seed.json:
-  // - Mục chưa có -> thêm mới.
-  // - Mục đã có -> chỉ bổ sung chiêu/ghi chú còn thiếu (KHÔNG ghi đè dữ liệu đã sửa trên Discord).
-  const SOURCE = 'Seed data (repo)';
-  for (const file of (await fs.readdir(SEED_DIR)).filter((f) => f.endsWith('.seed.json'))) {
+  // Nạp seed data nếu kho values chưa có gì
+  if (!state.values || Object.keys(state.values).length === 0) {
     try {
-      const seed = JSON.parse(await fs.readFile(path.join(SEED_DIR, file), 'utf8'));
-      for (const f of seed) {
-        const cur = state.fruits[f.key];
-        if (!cur) {
-          state.fruits[f.key] = { category: 'fruit', caps: {}, notes: '', sources: f.caps ? [SOURCE] : [], ...f };
-          continue;
-        }
-        cur.category ??= f.category ?? 'fruit';
-        for (const [m, v] of Object.entries(f.caps ?? {})) if (!(m in cur.caps)) cur.caps[m] = v;
-        if (!cur.notes && f.notes) cur.notes = f.notes;
+      const seed = JSON.parse(await fs.readFile(SEED_FILE, 'utf8'));
+      state.values = {};
+      for (const item of seed) {
+        state.values[item.key] = item;
       }
+      state.lastSync = new Date().toISOString();
+      console.log(`[store] Đã nạp ${seed.length} items từ values.seed.json`);
     } catch (e) {
-      console.warn(`[store] Không đọc được ${file}:`, e.message);
+      console.warn('[store] Không đọc được values.seed.json:', e.message);
     }
   }
-  for (const f of Object.values(state.fruits)) f.category ??= 'fruit';
+
   await flush();
 }
 
@@ -83,8 +71,6 @@ export function getGuild(id) {
   g.autoJoin ??= true;
   g.ignorePrefix ??= '//';
   g.maxLength ??= 300;
-  g.reviewChannelId ??= null;
-  g.editorRoleIds ??= [];
   return g;
 }
 
@@ -92,4 +78,3 @@ export function getUser(id) {
   state.users[id] ??= { lang: null };
   return state.users[id];
 }
-

@@ -1,6 +1,5 @@
-// Smoke test: chạy bằng `node test/smoke.js` (không cần token Discord)
 import { synthesize, detectLang } from '../src/tts.js';
-import { fetchFruitFromWiki } from '../src/wiki.js';
+import { fetchValuesFromSheet, allValues, findValue } from '../src/values.js';
 import { generateDependencyReport } from '@discordjs/voice';
 import { commandData } from '../src/commands.js';
 
@@ -13,11 +12,10 @@ const en = await synthesize('Hello, this is the text to speech bot.', 'en');
 console.log('TTS vi bytes:', vi.length, '| en bytes:', en.length);
 
 try {
-  const w = await fetchFruitFromWiki('Magu Magu no Mi');
-  console.log('Wiki:', w?.title, w?.url);
-  console.log('Infobox keys:', Object.keys(w?.infobox ?? {}).slice(0, 10));
-  console.log('Cap lines:', w?.capLines?.slice(0, 5));
+  const items = await fetchValuesFromSheet();
+  console.log('Lấy từ Google Sheet thành công, tổng số items:', items.length);
+  const sample = items.find((i) => i.isShiny);
+  console.log('Sample Shiny Item:', sample?.name, sample?.value, sample?.tier);
 } catch (e) {
-  console.log('Wiki lỗi:', e.message);
+  console.log('Sheet lỗi:', e.message);
 }
-

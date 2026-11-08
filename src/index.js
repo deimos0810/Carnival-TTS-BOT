@@ -12,8 +12,16 @@ import { initStore, getGuild, getUser, save, state } from './store.js';
 import { commandData } from './commands.js';
 import { getSession, joinChannel, leave, sessionCount } from './voice.js';
 import { detectLang, LANGS } from './tts.js';
-import * as F from './fruits.js';
-import { fetchFruitFromWiki } from './wiki.js';
+import {
+  findValue,
+  searchValues,
+  allValues,
+  valueEmbed,
+  valueSpeech,
+  syncValues,
+  CATEGORIES,
+  SHEET_URL,
+} from './values.js';
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('Thiếu DISCORD_TOKEN trong biến môi trường!');
@@ -24,20 +32,25 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // Privileged: phải bật trong Developer Portal
+    GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
-startServer(() => ({ bot: client.user?.tag ?? null, ready: client.isReady(), guilds: client.guilds.cache.size, voice: sessionCount() }));
+startServer(() => ({
+  bot: client.user?.tag ?? null,
+  ready: client.isReady(),
+  guilds: client.guilds.cache.size,
+  voice: sessionCount(),
+  items: Object.keys(state.values || {}).length,
+  lastSync: state.lastSync,
+}));
 
 // ---------------- Helpers ----------------
 const ephemeral = MessageFlags.Ephemeral;
 const isAdmin = (member) => member?.permissions?.has(PermissionFlagsBits.ManageGuild);
 const isOwner = (userId) => process.env.BOT_OWNER_ID && userId === process.env.BOT_OWNER_ID;
 const hasTTSRole = (member, cfg) => cfg.roleIds.some((r) => member.roles.cache.has(r));
-const isEditor = (member, cfg) =>
-  isOwner(member.id) || isAdmin(member) || cfg.editorRoleIds.some((r) => member.roles.cache.has(r));
 
 function resolveLang(userId, cfg, text) {
   const pref = getUser(userId).lang || cfg.defaultLang;
@@ -47,45 +60,59 @@ function resolveLang(userId, cfg, text) {
 function cleanMessage(msg, maxLength) {
   let t = msg.cleanContent
     .replace(/```[\s\S]*?```/g, ' code ')
-    .replace(/<a?:(\w+):\d+>/g, '$1') // emoji custom -> tên
+    .replace(/<a?:(\w+):\d+>/g, '$1')
     .replace(/<t:\d+(:\w)?>/g, '')
     .replace(/https?:\/\/\S+/gi, ' link ')
     .replace(/\|\|[\s\S]*?\|\|/g, ' spoiler ')
     .replace(/[*_~`>#|@]/g, '')
-    .replace(/(.)\1{4,}/g, '$1$1$1') // "aaaaaaa" -> "aaa"
+    .replace(/(.)\1{4,}/g, '$1$1$1')
     .replace(/\s+/g, ' ')
     .trim();
   if (t.length > maxLength) t = t.slice(0, maxLength);
   return t;
 }
 
-// ---------------- Ready ----------------
+// ---------------- Ready & Guild Events ----------------
 client.once(Events.ClientReady, async (c) => {
   console.log(`[bot] Đăng nhập: ${c.user.tag} | ${c.guilds.cache.size} server`);
+
   // Đăng ký slash command tức thì cho TẤT CẢ các server bot đang tham gia
   for (const guild of c.guilds.cache.values()) {
     try {
       await guild.commands.set(commandData);
-      console.log(`[bot] Đã đăng ký slash command tức thì cho: ${guild.name} (${guild.id})`);
+      console.log(`[bot] Đã đăng ký lệnh cho server: ${guild.name} (${guild.id})`);
     } catch (e) {
-      console.warn(`[bot] Không thể đăng ký command cho ${guild.name}:`, e.message);
+      console.warn(`[bot] Không thể đăng ký lệnh cho ${guild.name}:`, e.message);
     }
   }
+
   // Đồng thời đăng ký global
   c.application.commands.set(commandData).catch((e) => console.warn('[bot] Lỗi đăng ký global:', e.message));
+
+  // Đồng bộ dữ liệu mới nhất từ Google Sheet khi bot vừa khởi động
+  syncValues()
+    .then((n) => console.log(`[values] Đã đồng bộ ${n} items từ Google Sheet lúc khởi động!`))
+    .catch((e) => console.warn('[values] Chưa tải được sheet mới, đang dùng seed data:', e.message));
+
+  // Tự động kiểm tra và cập nhật lại từ Google Sheet mỗi 30 phút một lần
+  setInterval(() => {
+    syncValues()
+      .then((n) => console.log(`[values] [Auto-Sync] Cập nhật thành công ${n} items từ Google Sheet!`))
+      .catch((e) => console.warn('[values] [Auto-Sync] Lỗi:', e.message));
+  }, 30 * 60 * 1000);
 });
 
 // Tự động đăng ký slash command ngay khi bot được mời vào server mới
 client.on(Events.GuildCreate, async (guild) => {
   try {
     await guild.commands.set(commandData);
-    console.log(`[bot] Đã vào server mới và đăng ký lệnh tức thì: ${guild.name} (${guild.id})`);
+    console.log(`[bot] Đã vào server mới và đăng ký lệnh: ${guild.name} (${guild.id})`);
   } catch (e) {
     console.warn(`[bot] Không thể đăng ký command cho server mới ${guild.name}:`, e.message);
   }
 });
 
-// ---------------- Đọc tin nhắn ----------------
+// ---------------- Đọc tin nhắn (TTS) ----------------
 client.on(Events.MessageCreate, async (msg) => {
   try {
     if (!msg.inGuild() || msg.author.bot || msg.system) return;
@@ -94,13 +121,12 @@ client.on(Events.MessageCreate, async (msg) => {
     if (cfg.ignorePrefix && msg.content.startsWith(cfg.ignorePrefix)) return;
 
     const member = msg.member ?? (await msg.guild.members.fetch(msg.author.id).catch(() => null));
-    if (!member || !hasTTSRole(member, cfg)) return; // Chỉ đọc người có role
+    if (!member || !hasTTSRole(member, cfg)) return;
 
     const userVC = member.voice.channel;
-    if (!userVC) return; // Người gửi phải đang ở voice
+    if (!userVC) return;
 
     let session = getSession(msg.guild.id);
-    // Kênh hợp lệ: kênh đã cấu hình, hoặc chat của chính voice channel
     const allowedChannel = cfg.channelIds.includes(msg.channel.id) || msg.channel.id === userVC.id;
     if (!allowedChannel) return;
 
@@ -108,7 +134,7 @@ client.on(Events.MessageCreate, async (msg) => {
       if (!cfg.autoJoin || !userVC.joinable) return;
       session = await joinChannel(userVC);
     } else if (session.channelId !== userVC.id) {
-      return; // Bot đang ở kênh voice khác
+      return;
     }
 
     let text = cleanMessage(msg, cfg.maxLength);
@@ -148,7 +174,11 @@ client.on(Events.InteractionCreate, async (i) => {
         if (!vc.joinable) return i.reply({ content: '❌ Bot không có quyền vào kênh này.', flags: ephemeral });
         await i.deferReply();
         await joinChannel(vc);
-        return i.editReply(`🔊 Đã vào **${vc.name}**. Bot sẽ đọc tin nhắn của người có role: ${cfg.roleIds.map((r) => `<@&${r}>`).join(', ') || '_(chưa cài, dùng `/tts addrole`)_'}`);
+        return i.editReply(
+          `🔊 Đã vào **${vc.name}**. Bot sẽ đọc tin nhắn của người có role: ${
+            cfg.roleIds.map((r) => `<@&${r}>`).join(', ') || '_(chưa cài, dùng `/tts addrole`)_'
+          }`,
+        );
       }
       case 'leave':
         return i.reply(leave(i.guildId) ? '👋 Đã rời voice.' : 'Bot không ở trong voice.');
@@ -173,8 +203,8 @@ client.on(Events.InteractionCreate, async (i) => {
       }
       case 'tts':
         return await handleTTS(i, cfg, member);
-      case 'fruit':
-        return await handleFruit(i, cfg, member);
+      case 'value':
+        return await handleValue(i, member);
     }
   } catch (e) {
     console.error('[cmd] Lỗi:', e);
@@ -190,7 +220,10 @@ async function handleTTS(i, cfg, member) {
     const lang = i.options.getString('lang');
     getUser(i.user.id).lang = lang;
     save();
-    return i.reply({ content: `✅ Giọng của bạn: **${lang === 'auto' ? 'Tự động' : LANGS[lang]}**`, flags: ephemeral });
+    return i.reply({
+      content: `✅ Giọng của bạn: **${lang === 'auto' ? 'Tự động' : LANGS[lang]}**`,
+      flags: ephemeral,
+    });
   }
   if (sub === 'settings') {
     const e = new EmbedBuilder()
@@ -198,12 +231,22 @@ async function handleTTS(i, cfg, member) {
       .setTitle('⚙️ Cài đặt TTS')
       .addFields(
         { name: 'Trạng thái', value: cfg.enabled ? '🟢 Bật' : '🔴 Tắt', inline: true },
-        { name: 'Giọng mặc định', value: cfg.defaultLang === 'auto' ? 'Tự động' : LANGS[cfg.defaultLang], inline: true },
+        {
+          name: 'Giọng mặc định',
+          value: cfg.defaultLang === 'auto' ? 'Tự động' : LANGS[cfg.defaultLang],
+          inline: true,
+        },
         { name: 'Đọc tên', value: cfg.sayName ? 'Có' : 'Không', inline: true },
         { name: 'Tự vào voice', value: cfg.autoJoin ? 'Có' : 'Không', inline: true },
         { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
-        { name: 'Role được đọc', value: cfg.roleIds.map((r) => `<@&${r}>`).join(', ') || '_Chưa có — bot sẽ không đọc ai_' },
-        { name: 'Kênh chat thêm', value: cfg.channelIds.map((c) => `<#${c}>`).join(', ') || '_Chỉ chat của kênh voice_' },
+        {
+          name: 'Role được đọc',
+          value: cfg.roleIds.map((r) => `<@&${r}>`).join(', ') || '_Chưa có — bot sẽ không đọc ai_',
+        },
+        {
+          name: 'Kênh chat thêm',
+          value: cfg.channelIds.map((c) => `<#${c}>`).join(', ') || '_Chỉ chat của kênh voice_',
+        },
       );
     return i.reply({ embeds: [e], flags: ephemeral });
   }
@@ -263,174 +306,162 @@ async function handleTTS(i, cfg, member) {
   return i.reply({ content: reply, flags: ephemeral });
 }
 
-async function handleFruit(i, cfg, member) {
+// ---------------- Value List Handlers ----------------
+async function handleValue(i, member) {
   const sub = i.options.getSubcommand();
-  const fruitName = i.options.getString('fruit');
-  const needFruit = () => {
-    const f = F.findFruit(fruitName);
-    if (!f) throw new Error(`Không tìm thấy trái "${fruitName}". Dùng \`/fruit list\` hoặc \`/fruit wiki\`.`);
-    return f;
-  };
-  const requireEditor = () => {
-    if (!isEditor(member, cfg)) throw new Error('Bạn không có quyền duyệt/sửa dữ liệu (cần Manage Server hoặc role editor).');
-  };
 
   switch (sub) {
-    case 'info': {
-      const f = needFruit();
-      await i.reply({ embeds: [F.fruitEmbed(f)] });
-      if (i.options.getBoolean('speak')) {
-        const vc = member.voice.channel;
-        if (!vc) return i.followUp({ content: '⚠️ Vào voice để bot đọc to.', flags: ephemeral });
-        const s = await joinChannel(vc);
-        const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
-        s.enqueue(F.fruitSpeech(f, lang), lang);
-      }
-      return;
-    }
-    case 'list': {
-      const catFilter = i.options.getString('category');
-      const list = F.allFruits(catFilter);
-      const catInfo = catFilter ? F.CATEGORIES[catFilter] : null;
-      const title = catInfo ? `${catInfo.emoji} ${catInfo.label} (${list.length})` : `📚 Danh sách Stat Cap (${list.length})`;
-      const lines = list.map((f) => {
-        const c = F.CATEGORIES[f.category] ?? F.CATEGORIES.other;
-        return `${Object.keys(f.caps).length ? '✅' : '▫️'} ${c.emoji} **${f.name}** (${Object.keys(f.caps).length} chiêu)`;
-      });
-      const e = new EmbedBuilder()
-        .setColor(0xff7a00)
-        .setTitle(title)
-        .setDescription(lines.join('\n').slice(0, 4000) || '_Không có mục nào._')
-        .setFooter({ text: '✅ = đã có dữ liệu stat cap · /fruit info <tên> để xem' });
-      return i.reply({ embeds: [e] });
-    }
-    case 'wiki': {
-      await i.deferReply();
-      const known = F.findFruit(fruitName);
-      const data = await fetchFruitFromWiki(known?.name.split(',')[0] ?? fruitName);
-      if (!data) return i.editReply(`❌ Không tìm thấy "${fruitName}" trên GPO Wiki.`);
-      const e = new EmbedBuilder().setColor(0x00b0f4).setTitle(`📖 ${data.title}`).setURL(data.url);
-      const info = Object.entries(data.infobox).slice(0, 12).map(([k, v]) => `**${k}**: ${v}`).join('\n');
-      if (info) e.addFields({ name: 'Thông tin', value: info.slice(0, 1024) });
-      e.addFields({
-        name: 'Dòng nhắc tới cap trên Wiki',
-        value: (data.capLines.map((l) => `• ${l}`).join('\n') || '_Trang Wiki không ghi stat cap._').slice(0, 1024),
-      });
-      e.setFooter({ text: 'Nguồn: GPO Fandom Wiki · Có thể chưa cập nhật theo bản game mới nhất' });
-      return i.editReply({ embeds: [e] });
-    }
-    case 'submit': {
-      const f = needFruit();
-      const source = i.options.getString('source');
-      const entry = F.addSubmission({
-        fruitKey: f.key,
-        move: i.options.getString('move'),
-        value: i.options.getString('value'),
-        source,
-        userId: i.user.id,
-        userTag: i.user.tag,
-        guildId: i.guildId,
-      });
-      await i.reply({
-        content: `📨 Đã gửi đóng góp **#${entry.id}**: ${f.name} · ${entry.move} = \`${entry.value}\`. Chờ editor duyệt!`,
-        flags: ephemeral,
-      });
-      if (cfg.reviewChannelId) {
-        const ch = await i.guild.channels.fetch(cfg.reviewChannelId).catch(() => null);
-        ch?.send(`🆕 Đóng góp **#${entry.id}** từ ${i.user}: **${f.name}** · ${entry.move} = \`${entry.value}\`${source ? `\nNguồn: <${source}>` : ''}\n→ \`/fruit approve id:${entry.id}\` hoặc \`/fruit reject id:${entry.id}\``).catch(() => {});
-      }
-      return;
-    }
-    case 'pending': {
-      requireEditor();
-      const list = state.submissions.slice(0, 20);
-      if (!list.length) return i.reply({ content: '✨ Không có đóng góp nào chờ duyệt.', flags: ephemeral });
-      const text = list
-        .map((s) => `**#${s.id}** ${state.fruits[s.fruitKey]?.name ?? s.fruitKey} · ${s.move} = \`${s.value}\` — ${s.userTag}${s.source ? ` · <${s.source}>` : ''}`)
-        .join('\n');
-      return i.reply({ content: text.slice(0, 2000), flags: ephemeral });
-    }
-    case 'approve': {
-      requireEditor();
-      const s = F.removeSubmission(i.options.getInteger('id'));
-      if (!s) return i.reply({ content: '❌ Không tìm thấy ID.', flags: ephemeral });
-      const f = state.fruits[s.fruitKey];
-      if (!f) return i.reply({ content: '❌ Trái này không còn tồn tại.', flags: ephemeral });
-      F.setCap(f, s.move, s.value, { by: `${s.userTag} (duyệt bởi ${i.user.tag})`, source: s.source });
-      return i.reply(`✅ Đã duyệt **#${s.id}**: ${f.name} · ${s.move} = \`${s.value}\``);
-    }
-    case 'reject': {
-      requireEditor();
-      const s = F.removeSubmission(i.options.getInteger('id'));
-      return i.reply({ content: s ? `🗑️ Đã từ chối #${s.id}.` : '❌ Không tìm thấy ID.', flags: ephemeral });
-    }
-    case 'set': {
-      requireEditor();
-      const cat = i.options.getString('category') ?? 'fruit';
-      const f = F.findFruit(fruitName) ?? F.createFruit(fruitName, cat);
-      if (i.options.getString('category')) f.category = cat;
-      F.setCap(f, i.options.getString('move'), i.options.getString('value'), {
-        by: i.user.tag,
-        source: i.options.getString('source'),
-      });
-      return i.reply({ embeds: [F.fruitEmbed(f)] });
-    }
-    case 'import': {
-      requireEditor();
-      const cat = i.options.getString('category');
-      const text = i.options.getString('text');
-      const source = i.options.getString('source');
-      const parsed = F.parseImport(text);
-      if (!parsed.length) {
+    case 'search': {
+      const query = i.options.getString('item');
+      const item = findValue(query);
+      if (!item) {
         return i.reply({
-          content: '❌ Không nhận diện được dữ liệu nào. Định dạng mẫu:\n```\nIron Fist\n• R = 391\n• Z = 541\n• Recommend Stat = 720 STR + 300 FS\n```',
+          content: `❌ Không tìm thấy item nào có tên "${query}". Hãy gõ để chọn từ gợi ý!`,
           flags: ephemeral,
         });
       }
-      const applied = F.applyImport(parsed, cat, { by: i.user.tag, source });
-      const summary = applied.map((a) => `• **${a.fruit.name}**: đã cập nhật ${a.count} chiêu${a.fruit.notes ? ` (${a.fruit.notes})` : ''}`).join('\n');
-      return i.reply({
-        content: `✅ Đã nhập thành công **${applied.length}** mục (${F.CATEGORIES[cat]?.label}):\n${summary}`.slice(0, 2000),
+
+      await i.reply({ embeds: [valueEmbed(item)] });
+
+      if (i.options.getBoolean('speak')) {
+        const vc = member.voice.channel;
+        if (!vc) {
+          return i.followUp({ content: '⚠️ Bạn hãy vào phòng voice để bot đọc giá trị.', flags: ephemeral });
+        }
+        const s = await joinChannel(vc);
+        const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
+        s.enqueue(valueSpeech(item, lang), lang);
+      }
+      return;
+    }
+
+    case 'list': {
+      const category = i.options.getString('category');
+      const tier = i.options.getString('tier');
+      const isShiny = i.options.getBoolean('shiny');
+      const isUnob = i.options.getBoolean('unob');
+
+      const list = allValues({
+        category: category ?? 'all',
+        tier: tier ?? undefined,
+        isShiny: isShiny === null ? undefined : isShiny,
+        isUnob: isUnob === null ? undefined : isUnob,
       });
+
+      const filters = [];
+      if (category && category !== 'all') filters.push(CATEGORIES[category]?.label);
+      if (tier) filters.push(tier);
+      if (isShiny) filters.push('Shiny / Rainbow');
+      if (isUnob) filters.push('Unobtainable');
+
+      const title = filters.length ? `📊 Danh sách (${filters.join(' • ')})` : '📊 Danh sách AA Value List';
+
+      if (!list.length) {
+        return i.reply({
+          content: `🔍 Không tìm thấy item nào phù hợp với bộ lọc đã chọn.`,
+          flags: ephemeral,
+        });
+      }
+
+      // Giới hạn 25 item mỗi trang hiển thị
+      const display = list.slice(0, 25);
+      const lines = display.map((it) => {
+        const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
+        const shiny = it.isShiny ? '✨' : '';
+        const unob = it.isUnob ? '🔒' : '';
+        return `${cat.emoji}${shiny}${unob} **${it.name}** • Value: \`${it.value}\` • Demand: \`${it.demand}\``;
+      });
+
+      const e = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle(`${title} — Tìm thấy ${list.length} mục`)
+        .setURL(SHEET_URL)
+        .setDescription(lines.join('\n'))
+        .setFooter({
+          text: list.length > 25 ? `Hiển thị 25/${list.length} mục. Dùng /value search để xem chi tiết từng món.` : 'Dùng /value search để xem chi tiết.',
+        });
+
+      return i.reply({ embeds: [e] });
     }
-    case 'remove': {
-      requireEditor();
-      const f = needFruit();
-      const ok = F.removeCap(f, i.options.getString('move'));
-      return i.reply({ content: ok ? '🗑️ Đã xoá.' : '❌ Chiêu này chưa có dữ liệu.', flags: ephemeral });
+
+    case 'info': {
+      const all = Object.values(state.values || {});
+      const gamepasses = all.filter((i) => i.category === 'gamepass').length;
+      const units = all.filter((i) => i.category === 'unit').length;
+      const sTier = all.filter((i) => i.tier === 'S Tier').length;
+      const aTier = all.filter((i) => i.tier === 'A Tier').length;
+      const bTier = all.filter((i) => i.tier === 'B Tier').length;
+      const cTier = all.filter((i) => i.tier === 'C Tier').length;
+      const skins = all.filter((i) => i.category === 'skin').length;
+      const relics = all.filter((i) => i.category === 'relic').length;
+      const shinies = all.filter((i) => i.isShiny).length;
+      const unobs = all.filter((i) => i.isUnob).length;
+
+      const e = new EmbedBuilder()
+        .setColor(0x00b0f4)
+        .setTitle('📊 Thông tin AA Value List')
+        .setURL(SHEET_URL)
+        .setDescription(`Bảng giá được đồng bộ trực tiếp từ [Google Spreadsheet chính thức](${SHEET_URL}).`)
+        .addFields(
+          { name: '📦 Tổng số item', value: `\`${all.length}\``, inline: true },
+          { name: '🎮 Gamepasses', value: `\`${gamepasses}\``, inline: true },
+          { name: '⚔️ Tổng Units', value: `\`${units}\``, inline: true },
+          {
+            name: '🏆 Phân hạng Unit',
+            value: `• **S Tier**: ${sTier}\n• **A Tier**: ${aTier}\n• **B Tier**: ${bTier}\n• **C Tier**: ${cTier}`,
+            inline: true,
+          },
+          {
+            name: '✨ Phân loại đặc biệt',
+            value: `• **Shiny / Rainbow**: ${shinies}\n• **Unobtainable (Unob)**: ${unobs}\n• **Skins**: ${skins}\n• **Relics**: ${relics}`,
+            inline: true,
+          },
+          {
+            name: '🕒 Lần đồng bộ gần nhất',
+            value: state.lastSync ? `<t:${Math.floor(new Date(state.lastSync).getTime() / 1000)}:R>` : 'Chưa có',
+            inline: true,
+          },
+        )
+        .setFooter({ text: 'Bot tự động đồng bộ mỗi 30 phút một lần • /value sync để cập nhật ngay' });
+
+      return i.reply({ embeds: [e] });
     }
-    case 'note': {
-      requireEditor();
-      const f = needFruit();
-      f.notes = i.options.getString('text') ?? '';
-      save();
-      return i.reply({ content: '✅ Đã cập nhật ghi chú.', flags: ephemeral });
-    }
-    case 'reviewchannel': {
-      if (!isAdmin(member)) throw new Error('Cần quyền Manage Server.');
-      cfg.reviewChannelId = i.options.getChannel('channel').id;
-      save();
-      return i.reply({ content: `✅ Đóng góp mới sẽ được báo vào <#${cfg.reviewChannelId}>.`, flags: ephemeral });
-    }
-    case 'editorrole': {
-      if (!isAdmin(member)) throw new Error('Cần quyền Manage Server.');
-      const r = i.options.getRole('role');
-      const idx = cfg.editorRoleIds.indexOf(r.id);
-      if (idx === -1) cfg.editorRoleIds.push(r.id);
-      else cfg.editorRoleIds.splice(idx, 1);
-      save();
-      return i.reply({ content: idx === -1 ? `✅ ${r} giờ có thể duyệt dữ liệu.` : `✅ Đã bỏ quyền editor của ${r}.`, flags: ephemeral });
+
+    case 'sync': {
+      if (!isAdmin(member) && !isOwner(i.user.id)) {
+        return i.reply({ content: '❌ Bạn cần quyền **Manage Server** để đồng bộ dữ liệu.', flags: ephemeral });
+      }
+      await i.deferReply();
+      try {
+        const count = await syncValues();
+        return i.editReply(
+          `✅ Đã đồng bộ thành công **${count}** items từ [Google Spreadsheet](${SHEET_URL})!\nThời gian: <t:${Math.floor(
+            Date.now() / 1000,
+          )}:R>`,
+        );
+      } catch (err) {
+        return i.editReply(`❌ Lỗi khi đồng bộ từ Google Sheet: ${err.message}`);
+      }
     }
   }
 }
 
 async function handleAutocomplete(i) {
   const focused = i.options.getFocused();
-  const choices = F.searchFruits(focused).map((f) => {
-    const emoji = F.CATEGORIES[f.category]?.emoji ?? '🍎';
-    return { name: `${emoji} ${f.name}`.slice(0, 100), value: f.key };
+  const choices = searchValues(focused, 25).map((it) => {
+    const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
+    const shiny = it.isShiny ? '✨' : '';
+    const tier = it.tier ? `[${it.tier}] ` : '';
+    return {
+      name: `${shiny}${cat.emoji} ${tier}${it.name} (Val: ${it.value})`.slice(0, 100),
+      value: it.key,
+    };
   });
-  await i.respond(choices.length ? choices : [{ name: focused.slice(0, 100) || '...', value: focused.slice(0, 100) || '...' }]);
+  await i.respond(
+    choices.length
+      ? choices
+      : [{ name: focused.slice(0, 100) || 'Gõ để tìm kiếm...', value: focused.slice(0, 100) || 'none' }],
+  );
 }
 
 // ---------------- Start ----------------
@@ -439,4 +470,3 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e));
 
 await initStore();
 await client.login(process.env.DISCORD_TOKEN);
-
