@@ -7,7 +7,17 @@ function parseNumber(str, def = 0) {
   return isNaN(n) ? def : n;
 }
 
-/** Tách chuỗi danh sách item, hỗ trợ số lượng như "2x Grand Return Bundle" hoặc "Dio + Summer Bundle 1" */
+function cleanItemName(raw) {
+  return raw
+    .replace(/\s*\([^)]*Val:[^)]*\)/gi, '')
+    .replace(/\s*\([^)]*Tier[^)]*\)/gi, '')
+    .replace(/\s*\([^)]*Demand:[^)]*\)/gi, '')
+    .replace(/^[\s*xX•\-_:;,~`|⚔🎮🎨🔮✨📊]+/g, '')
+    .replace(/[\s*xX•\-_:;,~`|⚔🎮🎨🔮✨📊]+$/g, '')
+    .trim();
+}
+
+/** Tách chuỗi danh sách item, hỗ trợ số lượng (vd: "2 darkmage", "2x Grand Return Bundle", "Battle Pass, VIP") */
 export function parseTradeItems(text) {
   if (!text) return { items: [], notFound: [] };
   const parts = text
@@ -22,18 +32,29 @@ export function parseTradeItems(text) {
     let qty = 1;
     let cleanName = part;
 
-    // Nhận diện số lượng: "2x Item", "2* Item", "Item x2", "Item*2"
-    const match1 = part.match(/^(\d+)\s*[*xX]\s*(.+)$/);
-    const match2 = part.match(/^(.+?)\s*[*xX]\s*(\d+)$/);
-    if (match1) {
-      qty = Math.max(1, parseInt(match1[1], 10));
-      cleanName = match1[2].trim();
-    } else if (match2) {
-      qty = Math.max(1, parseInt(match2[2], 10));
-      cleanName = match2[1].trim();
+    // Pattern 1: "2x item" or "2* item"
+    const m1 = cleanName.match(/^(\d+)\s*[*xX]\s*(.+)$/);
+    if (m1) {
+      qty = Math.max(1, parseInt(m1[1], 10));
+      cleanName = m1[2];
+    } else {
+      // Pattern 2: "2 item" (số đứng trước chữ, vd: "2 darkmage" hoặc "2 battle pass")
+      const m2 = cleanName.match(/^(\d+)\s+([a-zA-Z\u00C0-\u1EF9].+)$/);
+      if (m2) {
+        qty = Math.max(1, parseInt(m2[1], 10));
+        cleanName = m2[2];
+      } else {
+        // Pattern 3: "item x2"
+        const m3 = cleanName.match(/^(.+?)\s*[*xX]\s*(\d+)$/);
+        if (m3) {
+          qty = Math.max(1, parseInt(m3[2], 10));
+          cleanName = m3[1];
+        }
+      }
     }
 
-    const item = findValue(cleanName);
+    const stripped = cleanItemName(cleanName);
+    const item = findValue(stripped) || findValue(cleanName);
     if (item) {
       // Gộp nếu cùng item
       const existing = items.find((e) => e.item.key === item.key);
@@ -263,15 +284,25 @@ export function tradeSpeech(result, lang = 'vi') {
   return t;
 }
 
-/** Autocomplete thông minh hỗ trợ gõ tiếp sau dấu phẩy/cộng */
+/** Autocomplete thông minh hỗ trợ gõ tiếp sau dấu phẩy/cộng và giữ số lượng (vd: "2 dark mage") */
 export function handleTradeAutocomplete(input) {
   const parts = input.split(/[,+]/);
   const prefix = parts.slice(0, -1).map((s) => s.trim()).filter(Boolean).join(', ');
-  const current = parts[parts.length - 1].trim();
+  const rawCurrent = parts[parts.length - 1].trim();
 
-  const matches = searchValues(current, 10);
+  // Tách số lượng nếu người dùng gõ số trước (vd: "2 dark mage" hoặc "2x dio")
+  let qtyPrefix = '';
+  let searchQuery = rawCurrent;
+  const qMatch = rawCurrent.match(/^(\d+\s*[*xX]?\s*)(.*)$/);
+  if (qMatch && qMatch[2]) {
+    qtyPrefix = qMatch[1].trim() + ' ';
+    searchQuery = qMatch[2].trim();
+  }
+
+  const matches = searchValues(searchQuery, 10);
   return matches.map((it) => {
-    const fullValue = prefix ? `${prefix}, ${it.name}` : it.name;
+    const itemWithQty = `${qtyPrefix}${it.name}`;
+    const fullValue = prefix ? `${prefix}, ${itemWithQty}` : itemWithQty;
     const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
     const shiny = it.isShiny ? '✨' : '';
     const tier = it.tier ? `[${it.tier}] ` : '';
@@ -281,3 +312,4 @@ export function handleTradeAutocomplete(input) {
     };
   });
 }
+

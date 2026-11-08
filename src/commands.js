@@ -10,6 +10,7 @@ const categoryChoices = [
   { name: '📦 Tất cả', value: 'all' },
   { name: '🎮 Gamepass & Bundle', value: 'gamepass' },
   { name: '⚔️ Unit (Tất cả Tier)', value: 'unit' },
+  { name: '📊 Chỉ số Stats (SSS, SS...)', value: 'stat' },
   { name: '🎨 Skin', value: 'skin' },
   { name: '🔮 Relic', value: 'relic' },
 ];

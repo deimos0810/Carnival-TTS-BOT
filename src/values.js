@@ -12,6 +12,7 @@ export const TABS = [
   { gid: '2118153850', name: 'C Tier', category: 'unit', tier: 'C Tier' },
   { gid: '2007444671', name: 'Skins', category: 'skin', tier: null },
   { gid: '451513775', name: 'Relics', category: 'relic', tier: null },
+  { gid: '2009773227', name: 'Stats', category: 'stat', tier: null },
   { gid: '742145845', name: 'Untradable', category: 'unit', tier: 'Untradable' },
 ];
 
@@ -19,6 +20,7 @@ export const CATEGORIES = {
   all: { label: 'Tất cả', emoji: '📦' },
   gamepass: { label: 'Gamepass & Bundle', emoji: '🎮' },
   unit: { label: 'Unit', emoji: '⚔️' },
+  stat: { label: 'Chỉ số Stats', emoji: '📊' },
   skin: { label: 'Skin', emoji: '🎨' },
   relic: { label: 'Relic', emoji: '🔮' },
 };
@@ -77,6 +79,54 @@ export async function fetchValuesFromSheet() {
       }
       const text = await res.text();
       const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+      if (t.name === 'Stats') {
+        let currentGroup = 'Stats (SSS)';
+        for (const line of lines) {
+          const cols = parseCsvLine(line).map(clean);
+          const col0 = cols[0];
+          if (!col0) continue;
+          if (/stats \((.*?)\)/i.test(col0)) {
+            const m = col0.match(/stats \((.*?)\)/i);
+            currentGroup = m[0];
+            continue;
+          }
+          if (/^(dmg|spa|rng|any)$/i.test(col0)) {
+            const gradeMatch = currentGroup.match(/\((.*?)\)/);
+            const grade = gradeMatch ? gradeMatch[1] : '';
+            let itemName = '';
+            let aliases = [];
+            if (grade.includes('to') || grade.includes('Under')) {
+              itemName = `Stats ${grade}`;
+              aliases = [grade.toLowerCase(), `stats ${grade.toLowerCase()}`];
+            } else {
+              itemName = `${grade} ${col0.toUpperCase()} (Stat)`;
+              aliases = [
+                `${grade} ${col0}`.toLowerCase(),
+                `${col0} ${grade}`.toLowerCase(),
+                `stats ${grade} ${col0}`.toLowerCase(),
+              ];
+            }
+            const key = `stat_${norm(grade)}_${norm(col0)}`;
+            items.push({
+              key,
+              name: itemName,
+              aliases,
+              category: 'stat',
+              tier: null,
+              value: cols[1] || '0',
+              demand: cols[2] || '0',
+              trend: cols[3] || 'Stable',
+              info: cols[4] || `Stats classified as ${grade}`,
+              isShiny: false,
+              isUnob: false,
+              sourceTab: 'Stats',
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+        continue;
+      }
 
       for (const line of lines) {
         const cols = parseCsvLine(line).map(clean);
@@ -190,14 +240,46 @@ export function findValue(query) {
   const byKey = list.find((i) => i.key.toLowerCase() === query.toLowerCase());
   if (byKey) return byKey;
 
-  // 3. Khớp theo tên chuẩn hoá
   const q = norm(query);
-  return (
-    list.find((i) => norm(i.name) === q) ??
-    list.find((i) => norm(i.name).startsWith(q)) ??
-    list.find((i) => norm(i.name).includes(q)) ??
-    null
-  );
+  const wantsShiny = /shiny|rainbow/i.test(query);
+
+  // 3. Khớp qua alias (đặc biệt là các chỉ số Stat như sss dmg, ss spa...)
+  const byAlias = list.find((i) => (i.aliases || []).some((a) => norm(a) === q));
+  if (byAlias) return byAlias;
+
+  // 4. Khớp theo tên chuẩn hoá (ưu tiên khớp chính xác hoặc bắt đầu bằng)
+  let exact = list.find((i) => norm(i.name) === q);
+  if (exact) return exact;
+
+  // Nếu người dùng không ghi "shiny", ưu tiên lấy bản Thường (Normal)
+  let candidates = list.filter((i) => norm(i.name).startsWith(q) || norm(i.name).includes(q));
+  if (!candidates.length) {
+    candidates = list.filter((i) => (i.aliases || []).some((a) => norm(a).includes(q)));
+  }
+
+  if (candidates.length) {
+    candidates.sort((a, b) => {
+      // Ưu tiên trùng khớp đầu tên
+      const aStarts = norm(a.name).startsWith(q);
+      const bStarts = norm(b.name).startsWith(q);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+
+      // Ưu tiên bản thường nếu người dùng không gõ "shiny"
+      if (!wantsShiny) {
+        if (!a.isShiny && b.isShiny) return -1;
+        if (a.isShiny && !b.isShiny) return 1;
+      } else {
+        if (a.isShiny && !b.isShiny) return -1;
+        if (!a.isShiny && b.isShiny) return 1;
+      }
+
+      return a.name.length - b.name.length;
+    });
+    return candidates[0];
+  }
+
+  return null;
 }
 
 export function valueEmbed(item) {
