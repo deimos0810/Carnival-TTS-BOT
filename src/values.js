@@ -182,10 +182,18 @@ export function searchValues(query, limit = 25) {
 
 export function findValue(query) {
   if (!query) return null;
-  const q = norm(query);
+  // 1. Khớp trực tiếp key từ gợi ý Autocomplete
+  if (state.values?.[query]) return state.values[query];
+
   const list = Object.values(state.values || {});
+  // 2. Khớp key (không phân biệt hoa thường)
+  const byKey = list.find((i) => i.key.toLowerCase() === query.toLowerCase());
+  if (byKey) return byKey;
+
+  // 3. Khớp theo tên chuẩn hoá
+  const q = norm(query);
   return (
-    list.find((i) => i.key === q || norm(i.name) === q) ??
+    list.find((i) => norm(i.name) === q) ??
     list.find((i) => norm(i.name).startsWith(q)) ??
     list.find((i) => norm(i.name).includes(q)) ??
     null
@@ -249,3 +257,4 @@ export function valueSpeech(item, lang = 'vi') {
   if (item.isUnob) text += 'This item is unobtainable. ';
   return text;
 }
+
