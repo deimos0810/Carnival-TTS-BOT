@@ -62,16 +62,26 @@ function cleanMessage(msg, maxLength) {
 // ---------------- Ready ----------------
 client.once(Events.ClientReady, async (c) => {
   console.log(`[bot] Đăng nhập: ${c.user.tag} | ${c.guilds.cache.size} server`);
-  try {
-    if (process.env.GUILD_ID) {
-      await c.application.commands.set(commandData, process.env.GUILD_ID);
-      console.log('[bot] Đã đăng ký slash command cho GUILD_ID');
-    } else {
-      await c.application.commands.set(commandData);
-      console.log('[bot] Đã đăng ký slash command global (có thể mất tới 1 giờ để hiện)');
+  // Đăng ký slash command tức thì cho TẤT CẢ các server bot đang tham gia
+  for (const guild of c.guilds.cache.values()) {
+    try {
+      await guild.commands.set(commandData);
+      console.log(`[bot] Đã đăng ký slash command tức thì cho: ${guild.name} (${guild.id})`);
+    } catch (e) {
+      console.warn(`[bot] Không thể đăng ký command cho ${guild.name}:`, e.message);
     }
+  }
+  // Đồng thời đăng ký global
+  c.application.commands.set(commandData).catch((e) => console.warn('[bot] Lỗi đăng ký global:', e.message));
+});
+
+// Tự động đăng ký slash command ngay khi bot được mời vào server mới
+client.on(Events.GuildCreate, async (guild) => {
+  try {
+    await guild.commands.set(commandData);
+    console.log(`[bot] Đã vào server mới và đăng ký lệnh tức thì: ${guild.name} (${guild.id})`);
   } catch (e) {
-    console.error('[bot] Lỗi đăng ký command:', e);
+    console.warn(`[bot] Không thể đăng ký command cho server mới ${guild.name}:`, e.message);
   }
 });
 
