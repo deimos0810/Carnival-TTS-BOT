@@ -1,0 +1,28 @@
+[
+  { "key": "bomu", "name": "Bomu Bomu no Mi", "aliases": ["bomb", "bomu"] },
+  { "key": "kilo", "name": "Kilo Kilo no Mi", "aliases": ["kilo"] },
+  { "key": "spin", "name": "Spin Spin no Mi", "aliases": ["spin"] },
+  { "key": "bari", "name": "Bari Bari no Mi", "aliases": ["barrier", "bari"] },
+  { "key": "horo", "name": "Horo Horo no Mi", "aliases": ["ghost", "horo"] },
+  { "key": "suke", "name": "Suke Suke no Mi", "aliases": ["clear", "invisible", "suke"] },
+  { "key": "gomu", "name": "Gomu Gomu no Mi", "aliases": ["rubber", "gomu"] },
+  { "key": "kage", "name": "Kage Kage no Mi", "aliases": ["shadow", "kage"] },
+  { "key": "mera", "name": "Mera Mera no Mi", "aliases": ["flame", "fire", "mera"] },
+  { "key": "hie", "name": "Hie Hie no Mi", "aliases": ["ice", "hie"] },
+  { "key": "pika", "name": "Pika Pika no Mi", "aliases": ["light", "pika"] },
+  { "key": "goro", "name": "Goro Goro no Mi", "aliases": ["lightning", "goro"] },
+  { "key": "suna", "name": "Suna Suna no Mi", "aliases": ["sand", "suna"] },
+  { "key": "gasu", "name": "Gasu Gasu no Mi", "aliases": ["gas", "gasu"] },
+  { "key": "moku", "name": "Moku Moku no Mi", "aliases": ["smoke", "moku"] },
+  { "key": "yuki", "name": "Yuki Yuki no Mi", "aliases": ["snow", "yuki"] },
+  { "key": "magu", "name": "Magu Magu no Mi", "aliases": ["magma", "magu"] },
+  { "key": "yami", "name": "Yami Yami no Mi", "aliases": ["dark", "darkness", "yami"] },
+  { "key": "ito", "name": "Ito Ito no Mi", "aliases": ["string", "ito"] },
+  { "key": "paw", "name": "Nikyu Nikyu no Mi", "aliases": ["paw", "nikyu"] },
+  { "key": "hobi", "name": "Hobi Hobi no Mi", "aliases": ["toy", "hobi"] },
+  { "key": "mochi", "name": "Mochi Mochi no Mi", "aliases": ["mochi"] },
+  { "key": "gura", "name": "Gura Gura no Mi", "aliases": ["quake", "tremor", "gura"] },
+  { "key": "ope", "name": "Ope Ope no Mi", "aliases": ["op", "ope", "room"] },
+  { "key": "phoenix", "name": "Tori Tori no Mi, Model: Phoenix", "aliases": ["phoenix", "tori"] }
+]
+
