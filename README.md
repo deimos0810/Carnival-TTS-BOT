@@ -13,7 +13,7 @@ Bot Discord đa năng kết hợp:
 
 | Lệnh | Phân quyền | Mô tả |
 |---|---|---|
-| `/wfl <give> <get> [speak] [lang]`<br>hoặc `/value trade ...` | Mọi người | **So sánh kèo trade Win / Fair / Loss (WFL)** giữa Unit vs Unit hoặc Unit vs Gamepass.<br>• Phân tích đa chiều: **Value**, **Demand**, **Trend**, **Shiny / Unob**<br>• Đưa ra kết luận: 🚀 **Big Win**, 🟢 **Win**, ⚖️ **Fair**, 🔴 **Loss**, 💀 **Big Loss**<br>• Hỗ trợ nhiều món: vd `give:Thorfinn, Summer Bundle 1` `get:Gohan`<br>• Hỗ trợ số lượng: vd `give:2x Shiny Hunter` |
+| `/wfl <give> <get> [give_qty] [get_qty] [give2] [get2]...` | Mọi người | **So sánh kèo trade Win / Fair / Loss (WFL)** giữa Unit, Gamepass, Stats, Skin.<br>• Phân tích đa chiều: **Value**, **Demand**, **Trend**, **Shiny / Unob**<br>• Đưa ra kết luận: 🚀 **Big Win**, 🟢 **Win**, ⚖️ **Fair**, 🔴 **Loss**, 💀 **Big Loss**<br>• **Các ô riêng biệt tiện lợi:** có sẵn các ô `give_qty`, `get_qty`, `give2`, `get2`, `give3`, `get3`, `give4`, `get4` (mỗi ô đều có Autocomplete gợi ý)<br>• Hoặc gõ gộp tự nhiên: `give: 2 dark mage` `get: Battle Pass, VIP` |
 | `/value search <item> [speak] [lang]` | Mọi người | **Tra cứu giá trị item** (Unit, Gamepass, Skin, Relic). Hỗ trợ gõ gợi ý nhanh (Autocomplete), tuỳ chọn `speak:True` để bot đọc to trong voice! |
 | `/value list [category] [tier] [shiny] [unob]` | Mọi người | **Xem danh sách phân loại**:<br>• Lọc theo: Gamepass, Unit, Skin, Relic<br>• Lọc theo Tier: S Tier, A Tier, B Tier, C Tier, Untradable<br>• Lọc riêng bản Shiny / Rainbow<br>• Lọc riêng các Unit Unobtainable (Unob / Limited / Event) |
 | `/value info` | Mọi người | Xem thống kê số lượng items, số lượng Shiny, Unob, link Google Sheet và thời gian đồng bộ |

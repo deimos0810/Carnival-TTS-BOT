@@ -98,6 +98,65 @@ const say = new SlashCommandBuilder()
   .addStringOption((o) => o.setName('text').setDescription('Nội dung').setRequired(true).setMaxLength(500))
   .addStringOption((o) => o.setName('lang').setDescription('Giọng').addChoices(...langChoices));
 
+function addTradeOptions(builder) {
+  return builder
+    .addStringOption((o) =>
+      o.setName('give').setDescription('Món 1 bạn đưa').setRequired(true).setAutocomplete(true),
+    )
+    .addStringOption((o) =>
+      o.setName('get').setDescription('Món 1 bạn nhận').setRequired(true).setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('give_qty').setDescription('Số lượng món 1 đưa (mặc định 1)').setMinValue(1).setMaxValue(999),
+    )
+    .addIntegerOption((o) =>
+      o.setName('get_qty').setDescription('Số lượng món 1 nhận (mặc định 1)').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('give2').setDescription('Món 2 bạn đưa (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('give2_qty').setDescription('Số lượng món 2 đưa').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('get2').setDescription('Món 2 bạn nhận (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('get2_qty').setDescription('Số lượng món 2 nhận').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('give3').setDescription('Món 3 bạn đưa (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('give3_qty').setDescription('Số lượng món 3 đưa').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('get3').setDescription('Món 3 bạn nhận (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('get3_qty').setDescription('Số lượng món 3 nhận').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('give4').setDescription('Món 4 bạn đưa (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('give4_qty').setDescription('Số lượng món 4 đưa').setMinValue(1).setMaxValue(999),
+    )
+    .addStringOption((o) =>
+      o.setName('get4').setDescription('Món 4 bạn nhận (tuỳ chọn)').setAutocomplete(true),
+    )
+    .addIntegerOption((o) =>
+      o.setName('get4_qty').setDescription('Số lượng món 4 nhận').setMinValue(1).setMaxValue(999),
+    )
+    .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
+    .addStringOption((o) =>
+      o
+        .setName('lang')
+        .setDescription('Giọng đọc')
+        .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
+    );
+}
+
 // --- Value List Commands ---
 const value = new SlashCommandBuilder()
   .setName('value')
@@ -127,30 +186,9 @@ const value = new SlashCommandBuilder()
       .addBooleanOption((o) => o.setName('unob').setDescription('Chỉ xem bản Unobtainable (Unob)?')),
   )
   .addSubcommand((s) =>
-    s
-      .setName('trade')
-      .setDescription('So sánh kèo trade Win / Fair / Loss giữa các Unit / Gamepass')
-      .addStringOption((o) =>
-        o
-          .setName('give')
-          .setDescription('Món bạn đưa (vd: Piccolo Shiny, hoặc nhiều món cách nhau dấu phẩy)')
-          .setRequired(true)
-          .setAutocomplete(true),
-      )
-      .addStringOption((o) =>
-        o
-          .setName('get')
-          .setDescription('Món bạn nhận (vd: Thorfinn, hoặc Summer Bundle 1)')
-          .setRequired(true)
-          .setAutocomplete(true),
-      )
-      .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
-      .addStringOption((o) =>
-        o
-          .setName('lang')
-          .setDescription('Giọng đọc')
-          .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
-      ),
+    addTradeOptions(
+      s.setName('trade').setDescription('So sánh kèo trade Win / Fair / Loss giữa các Unit / Gamepass'),
+    ),
   )
   .addSubcommand((s) =>
     s.setName('info').setDescription('Xem thông tin bảng giá, link Google Sheet và thời gian cập nhật'),
@@ -160,30 +198,11 @@ const value = new SlashCommandBuilder()
   );
 
 // Lệnh tắt /wfl để so sánh nhanh kèo trade
-const wfl = new SlashCommandBuilder()
-  .setName('wfl')
-  .setDescription('So sánh kèo trade Win / Fair / Loss (Unit, Gamepass, Skin, Relic)')
-  .addStringOption((o) =>
-    o
-      .setName('give')
-      .setDescription('Món bạn đưa (vd: Piccolo Shiny, hoặc nhiều món cách nhau dấu phẩy)')
-      .setRequired(true)
-      .setAutocomplete(true),
-  )
-  .addStringOption((o) =>
-    o
-      .setName('get')
-      .setDescription('Món bạn nhận (vd: Thorfinn, hoặc Summer Bundle 1)')
-      .setRequired(true)
-      .setAutocomplete(true),
-  )
-  .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
-  .addStringOption((o) =>
-    o
-      .setName('lang')
-      .setDescription('Giọng đọc')
-      .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
-  );
+const wfl = addTradeOptions(
+  new SlashCommandBuilder()
+    .setName('wfl')
+    .setDescription('So sánh kèo trade Win / Fair / Loss (Unit, Gamepass, Stats, Skin)'),
+);
 
 export const commandData = [tts, join, leave, skip, say, value, wfl].map((c) => c.toJSON());
 export { PermissionFlagsBits };
