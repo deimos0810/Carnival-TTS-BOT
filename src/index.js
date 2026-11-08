@@ -459,34 +459,12 @@ async function handleValue(i, member) {
 }
 
 async function handleTradeCommand(i, member) {
-  const collectSide = (prefix) => {
-    const rawInputs = [
-      { text: i.options.getString(prefix), qty: i.options.getInteger(`${prefix}_qty`) || 1 },
-      { text: i.options.getString(`${prefix}2`), qty: i.options.getInteger(`${prefix}2_qty`) || 1 },
-      { text: i.options.getString(`${prefix}3`), qty: i.options.getInteger(`${prefix}3_qty`) || 1 },
-      { text: i.options.getString(`${prefix}4`), qty: i.options.getInteger(`${prefix}4_qty`) || 1 },
-    ];
+  const giveStr = i.options.getString('give');
+  const getStr = i.options.getString('get');
 
-    const items = [];
-    const notFound = [];
+  const giveParsed = parseTradeItems(giveStr);
+  const getParsed = parseTradeItems(getStr);
 
-    for (const { text, qty } of rawInputs) {
-      if (!text) continue;
-      const parsed = parseTradeItems(text);
-      notFound.push(...parsed.notFound);
-      for (const itemEntry of parsed.items) {
-        // Nếu người dùng chọn ô qty riêng > 1 và trong text không ghi số lượng
-        const finalQty = qty > 1 && itemEntry.qty === 1 ? qty : itemEntry.qty;
-        const existing = items.find((e) => e.item.key === itemEntry.item.key);
-        if (existing) existing.qty += finalQty;
-        else items.push({ item: itemEntry.item, qty: finalQty });
-      }
-    }
-    return { items, notFound };
-  };
-
-  const giveParsed = collectSide('give');
-  const getParsed = collectSide('get');
   const notFound = [...giveParsed.notFound, ...getParsed.notFound];
 
   if (!giveParsed.items.length && !getParsed.items.length) {
@@ -513,8 +491,8 @@ async function handleTradeCommand(i, member) {
 async function handleAutocomplete(i) {
   const focusedOption = i.options.getFocused(true);
 
-  // Nếu đang gõ ở bất kỳ ô give/get nào của kèo trade (give, give2, give3, give4, get, get2, get3, get4)
-  if (focusedOption.name.startsWith('give') || focusedOption.name.startsWith('get')) {
+  // Nếu đang gõ ở ô give hoặc get của kèo trade
+  if (focusedOption.name === 'give' || focusedOption.name === 'get') {
     const choices = handleTradeAutocomplete(focusedOption.value);
     return await i.respond(choices.slice(0, 25));
   }

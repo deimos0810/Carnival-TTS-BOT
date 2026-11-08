@@ -101,52 +101,18 @@ const say = new SlashCommandBuilder()
 function addTradeOptions(builder) {
   return builder
     .addStringOption((o) =>
-      o.setName('give').setDescription('Món 1 bạn đưa').setRequired(true).setAutocomplete(true),
+      o
+        .setName('give')
+        .setDescription('Món bạn đưa (vd: 2 dark mage, hoặc dark mage, dio)')
+        .setRequired(true)
+        .setAutocomplete(true),
     )
     .addStringOption((o) =>
-      o.setName('get').setDescription('Món 1 bạn nhận').setRequired(true).setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('give_qty').setDescription('Số lượng món 1 đưa (mặc định 1)').setMinValue(1).setMaxValue(999),
-    )
-    .addIntegerOption((o) =>
-      o.setName('get_qty').setDescription('Số lượng món 1 nhận (mặc định 1)').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('give2').setDescription('Món 2 bạn đưa (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('give2_qty').setDescription('Số lượng món 2 đưa').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('get2').setDescription('Món 2 bạn nhận (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('get2_qty').setDescription('Số lượng món 2 nhận').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('give3').setDescription('Món 3 bạn đưa (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('give3_qty').setDescription('Số lượng món 3 đưa').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('get3').setDescription('Món 3 bạn nhận (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('get3_qty').setDescription('Số lượng món 3 nhận').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('give4').setDescription('Món 4 bạn đưa (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('give4_qty').setDescription('Số lượng món 4 đưa').setMinValue(1).setMaxValue(999),
-    )
-    .addStringOption((o) =>
-      o.setName('get4').setDescription('Món 4 bạn nhận (tuỳ chọn)').setAutocomplete(true),
-    )
-    .addIntegerOption((o) =>
-      o.setName('get4_qty').setDescription('Số lượng món 4 nhận').setMinValue(1).setMaxValue(999),
+      o
+        .setName('get')
+        .setDescription('Món bạn nhận (vd: 2 battle pass, hoặc battle pass, vip)')
+        .setRequired(true)
+        .setAutocomplete(true),
     )
     .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))
     .addStringOption((o) =>

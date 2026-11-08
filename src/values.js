@@ -213,12 +213,20 @@ export function allValues(filter = {}) {
 }
 
 export function searchValues(query, limit = 25) {
-  const q = norm(query);
+  const words = (query || '')
+    .trim()
+    .split(/\s+/)
+    .map(norm)
+    .filter(Boolean);
   const list = Object.values(state.values || {});
-  if (!q) return list.slice(0, limit);
+  if (!words.length) return list.slice(0, limit);
 
+  const q = norm(query);
   return list
-    .filter((i) => norm(i.name).includes(q) || norm(i.info).includes(q))
+    .filter((i) => {
+      const fullText = `${norm(i.name)} ${(i.aliases || []).map(norm).join(' ')} ${norm(i.info)}`;
+      return words.every((w) => fullText.includes(w));
+    })
     .sort((a, b) => {
       // Ưu tiên trùng khớp đầu tên
       const aStarts = norm(a.name).startsWith(q);
