@@ -197,11 +197,163 @@ const VI_SLANG = {
   // khác
   nc: 'nước', đt: 'điện thoại', hs: 'học sinh', sv: 'sinh viên', gv: 'giáo viên',
   kq: 'kết quả', vd: 'ví dụ', ib: 'inbox',
-  // cảm thán GenZ
-  vl: 'vãi', vcl: 'vãi cả lúa', vkl: 'vãi cả lúa', vch: 'vãi chưởng', sml: 'sấp mặt luôn',
-  đm: 'đậu má', dm: 'đậu má', duma: 'đậu má', đuma: 'đậu má',
-  clgt: 'cái lề gì thốn', tđn: 'thế đéo nào', tdn: 'thế đéo nào',
+  // cảm thán & từ bậy GenZ (dự án vui)
+  vl: 'vãi lồn', vcl: 'vãi cả lồn', vkl: 'vãi cả lồn', vcc: 'vãi cả cặc', vch: 'vãi chưởng',
+  vc: 'vãi cứt', vđ: 'vãi đái', vđl: 'vãi đái lồn',
+  đm: 'địt mẹ', dm: 'địt mẹ', đmm: 'địt mẹ mày', dmm: 'địt mẹ mày',
+  đcm: 'địt con mẹ', dcm: 'địt con mẹ', đcmn: 'địt con mẹ nó', dcmn: 'địt con mẹ nó',
+  đkm: 'địt con mẹ', dkm: 'địt con mẹ', đuma: 'đụ má', duma: 'đụ má',
+  cl: 'cái lồn', clgt: 'cái lồn gì thế', cclgt: 'cái con lồn gì thế',
+  ml: 'mặt lồn', sml: 'sấp mặt lồn', cc: 'con cặc',
+  đb: 'đầu buồi', db: 'đầu buồi', tđn: 'thế đéo nào', tdn: 'thế đéo nào',
+  cmm: 'con mẹ mày', cmn: 'con mẹ nó', cmnr: 'con mẹ nó rồi', cmnl: 'con mẹ nó luôn',
   chằm: 'trầm', kẻm: 'cảm', chớt: 'chết',
+};
+
+/** Từ điển phiên âm tiếng Anh theo ngữ điệu Việt hài hước, giúp đọc một giọng mượt mà, không bị đổi tông giật cục */
+export const EN_PHONETIC_VI = {
+  // Game & Trade
+  trade: 'trây',
+  trading: 'trây đing',
+  unit: 'du nịt',
+  units: 'du nịt',
+  item: 'ai tầm',
+  items: 'ai tầm',
+  win: 'win',
+  fair: 'phe',
+  loss: 'lốt',
+  lose: 'lút',
+  wfl: 'win phe lốt',
+  stat: 'sờ tát',
+  stats: 'sờ tát',
+  tier: 'tia',
+  shiny: 'xai ni',
+  skin: 'sờ kin',
+  skins: 'sờ kin',
+  relic: 're ních',
+  fruit: 'phờ rút',
+  fruits: 'phờ rút',
+  gamepass: 'gêm pát',
+  pass: 'pát',
+  bundle: 'băn đồ',
+  farm: 'fam',
+  farming: 'fam ming',
+  boss: 'bót',
+  raid: 'rết',
+  rank: 'ranh',
+  level: 'le vồ',
+  event: 'e ven',
+  carry: 'ce ry',
+  pro: 'pờ rô',
+  noob: 'núp',
+  team: 'tim',
+  game: 'gêm',
+  server: 'xơ vơ',
+  admin: 'át min',
+  mod: 'mót',
+  bot: 'bót',
+  code: 'cốt',
+  link: 'linh',
+  spam: 'xờ pam',
+  sell: 'xeo',
+  buy: 'bai',
+  free: 'phờ ri',
+  online: 'on lai',
+  offline: 'ọp lai',
+  update: 'ắp đét',
+
+  // Slang & Cảm thán
+  tbh: 'tu bi on nít',
+  ngl: 'nót go na lai',
+  fr: 'pho riu',
+  frfr: 'pho riu pho riu',
+  btw: 'bai đơ goay',
+  idk: 'ai đôn nâu',
+  idc: 'ai đôn ke',
+  imo: 'ai em ô',
+  omg: 'ô mai gót',
+  wtf: 'quát đờ phắc',
+  wth: 'quát đờ heo',
+  tf: 'đờ phắc',
+  lol: 'lon',
+  lmao: 'lờ mao',
+  ez: 'i zi',
+  gg: 'gi gi',
+  ggwp: 'gút gêm guen plây',
+  afk: 'a ép ca',
+  brb: 'bi rai bách',
+  npc: 'en pi xi',
+  op: 'ô pê',
+  bruh: 'bờ rúp',
+  bro: 'bờ rô',
+  sis: 'xít',
+  rizz: 'rít',
+  slay: 'xờ lây',
+  delulu: 'đê lu lu',
+  gyat: 'gát',
+  skibidi: 'xờ ki bi đi',
+  sigma: 'xích ma',
+  mewing: 'miu inh',
+  aura: 'au ra',
+  cringe: 'co rin',
+  vibe: 'vai',
+  chill: 'chiu',
+  flex: 'phờ lếch',
+  crush: 'cờ rắt',
+  simp: 'xỉm',
+  toxic: 'tốc xích',
+  drama: 'đờ ra ma',
+  trend: 'tren',
+  idol: 'ai đần',
+  fan: 'phan',
+  pls: 'pờ lí',
+  plz: 'pờ lí',
+  thx: 'thanh',
+  tks: 'thanh',
+  ty: 'thanh kiu',
+  tysm: 'thanh kiu so mát',
+  sr: 'so ri',
+  sry: 'so ri',
+  sorry: 'so ri',
+  hello: 'hê nâu',
+  hi: 'hai',
+  bye: 'bai',
+  yes: 'dét',
+  no: 'nô',
+  cap: 'cắp',
+  nocap: 'nô cắp',
+  gn: 'gút nai',
+  gm: 'gút mo ninh',
+  hbd: 'háp pi bớt đê',
+  top: 'tóp',
+  hot: 'hót',
+  mic: 'míc',
+  chat: 'chát',
+  map: 'mép',
+  nice: 'nai xừ',
+  good: 'gút',
+  bad: 'bét',
+  like: 'lai',
+  follow: 'pho lâu',
+  sub: 'xắp',
+  view: 'viu',
+  acc: 'ác',
+  ib: 'in bốc',
+  inbox: 'in bốc',
+  rep: 'dép',
+  cmt: 'còm men',
+  comment: 'còm men',
+  fb: 'phây búc',
+  tiktok: 'tóp tóp',
+  yt: 'diu túp',
+  youtube: 'diu túp',
+  discord: 'đít cọt',
+  ye: 'de',
+  yeah: 'de',
+  ok: 'ô kê',
+  oke: 'ô kê',
+  oki: 'ô kê',
+  okela: 'ô kê la',
 };
 
 /** Teencode chắc chắn là tiếng Việt -> dùng để đoán câu không dấu là tiếng Việt */
@@ -241,16 +393,22 @@ function isVietSyllable(w) {
 
 /**
  * Chuẩn hoá toàn bộ câu văn trước khi gửi tới TTS:
- *  - Mở rộng slang/teencode (thg -> thằng, tbh -> to be honest, ye -> de,...)
+ *  - Mở rộng slang/teencode (thg -> thằng, vl -> vãi lồn, đm -> địt mẹ,...)
+ *  - Phiên âm tiếng Anh sang ngữ điệu Việt (trade -> trây, unit -> du nịt, tbh -> tu bi on nít,...)
  *  - Áp dụng từ điển tuỳ chỉnh của server
  *  - Đọc mặt cười/tiếng cười thành chữ tự nhiên
- * Giữ nguyên cấu trúc câu liền mạch để AI TTS đọc tròn vành rõ chữ, đều nhịp!
+ * Đọc NGUYÊN CÂU trong 1 giọng duy nhất, không bị đổi tông hay gián đoạn lạc quẻ!
  */
-export function normalizeTextForSpeech(text, baseLang = 'vi', customDict = {}) {
+export function normalizeTextForSpeech(text, baseLang = 'vi', customDict = {}, phoneticVi = true) {
   const dict = { ...BUILTIN_DICT, ...customDict };
   // Xử lý cụm từ đặc biệt
   let t = text
-    .replace(/\bno\s+cap\b/gi, 'no cap')
+    .replace(/\bto\s+be\s+honest\b/gi, 'tbh')
+    .replace(/\bby\s+the\s+way\b/gi, 'btw')
+    .replace(/\bfor\s+real\b/gi, 'fr')
+    .replace(/\bnot\s+gonna\s+lie\b/gi, 'ngl')
+    .replace(/\bin\s+my\s+opinion\b/gi, 'imo')
+    .replace(/\bno\s+cap\b/gi, 'nocap')
     .replace(/\bthg\s+n([aàáạảãâầấậẩẫăằắặẳẵeèéẹẻẽêềếệểễoòóọỏõôồốộổỗơờớợởỡuùúụủũưừứựửữiìíịỉĩyỳýỵỷỹ])\b/gi, 'thằng n$1')
     .replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
 
@@ -268,15 +426,21 @@ export function normalizeTextForSpeech(text, baseLang = 'vi', customDict = {}) {
     let short = collapse(lower);
     if (short.length < 2) short = lower;
 
+    const custom = customDict[lower] ?? customDict[short];
     const entry = dict[lower] ?? dict[short];
     const slang = baseLang === 'vi' ? (VI_SLANG[lower] ?? VI_SLANG[short]) : undefined;
+    const phonetic = phoneticVi && baseLang === 'vi' ? (EN_PHONETIC_VI[lower] ?? EN_PHONETIC_VI[short]) : undefined;
 
-    if (entry) {
-      result.push(`${pre}${entry.say}${post}`);
+    if (custom) {
+      result.push(`${pre}${custom.say}${post}`);
     } else if (LAUGH.test(lower)) {
       result.push(`${pre}ha ha ha${post}`);
     } else if (slang) {
       result.push(`${pre}${slang}${post}`);
+    } else if (phonetic) {
+      result.push(`${pre}${phonetic}${post}`);
+    } else if (entry) {
+      result.push(`${pre}${entry.say}${post}`);
     } else {
       result.push(raw);
     }
@@ -480,23 +644,26 @@ async function google(text, lang) {
 export const engineName = (engine = 'google') =>
   engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY
     ? 'ElevenLabs (Brian / Adam)'
-    : 'Google (Thuần Việt 100% + Đọc tiếng Anh)';
+    : 'Google (Chị Google Thuần Việt)';
 
 /**
  * Chuyển văn bản thành 1 buffer MP3.
- * - Mặc định: Google TTS (Thuần Việt 100%, đọc "ngu" chuẩn "ngu", tự chuyển giọng đọc từ tiếng Anh)
- * - Tuỳ chọn: ElevenLabs (Giọng phương Tây nếu server chọn)
+ * - Mặc định (mode === 'smooth'): Đọc 100% trong 1 giọng duy nhất (Chị Google thuần Việt),
+ *   các từ tiếng Anh/slang được việt hoá phiên âm hài hước, đọc mượt mà, không giật cục, không đổi tông lạc quẻ!
+ * - Chế độ tách đoạn (mode === 'split'): Tách câu để đổi sang giọng Mỹ đọc từ tiếng Anh.
+ * - Tuỳ chọn Engine: ElevenLabs nếu server chọn.
  * @param {string} text
  * @param {'vi'|'en'} lang  ngôn ngữ chính
- * @param {{dict?: Record<string,{say:string,lang:string}>, engine?: string, voiceId?: string}} [opts]
+ * @param {{dict?: Record<string,{say:string,lang:string}>, engine?: string, mode?: string, voiceId?: string}} [opts]
  */
 export async function synthesize(text, lang = 'vi', opts = {}) {
   const dict = opts.dict || {};
   const engine = opts.engine || 'google';
+  const mode = opts.mode || 'smooth'; // 'smooth' (mượt mà hài hước - một giọng) hoặc 'split' (đổi giọng Mỹ)
 
   if (engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
     try {
-      const normalized = normalizeTextForSpeech(text, lang, dict);
+      const normalized = normalizeTextForSpeech(text, lang, dict, false);
       if (!normalized.trim()) throw new Error('Không có gì để đọc');
       return await elevenLabs(normalized, lang, opts.voiceId);
     } catch (e) {
@@ -504,7 +671,23 @@ export async function synthesize(text, lang = 'vi', opts = {}) {
     }
   }
 
-  // Google TTS: Thuần Việt 100% cho tiếng Việt, tự đổi sang English voice cho từ tiếng Anh
+  // 1. Chế độ Mượt mà (smooth - Mặc định):
+  // Khi câu là tiếng Việt: Việt hoá phiên âm tiếng Anh và đọc toàn bộ câu bằng giọng Chị Google tiếng Việt.
+  // Nhịp điệu hài hước, tự nhiên, tưng tửng, không bị đổi tông giọng lạ lẫm!
+  if (mode === 'smooth' && lang === 'vi') {
+    const normalized = normalizeTextForSpeech(text, 'vi', dict, true);
+    if (!normalized.trim()) throw new Error('Không có gì để đọc');
+    return await google(normalized, 'vi');
+  }
+
+  // Nếu câu là 100% tiếng Anh:
+  if (lang === 'en') {
+    const normalized = normalizeTextForSpeech(text, 'en', dict, false);
+    if (!normalized.trim()) throw new Error('Không có gì để đọc');
+    return await google(normalized, 'en');
+  }
+
+  // 2. Chế độ tách đoạn (split): Chuyển sang giọng Mỹ khi gặp từ tiếng Anh
   const segments = segmentText(text, lang, dict);
   if (!segments.length) throw new Error('Không có gì để đọc');
   const bufs = await Promise.all(segments.map((s) => google(s.text, s.lang)));

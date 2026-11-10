@@ -156,7 +156,7 @@ client.on(Events.MessageCreate, async (msg) => {
     }
     if (cfg.sayName) text = `${member.displayName} ${lang === 'vi' ? 'nói' : 'said'}: ${text}`;
     const u = getUser(msg.author.id);
-    session.enqueue(text, lang, u.voiceId, u.engine);
+    session.enqueue(text, lang, u.voiceId, u.engine, u.ttsMode);
   } catch (e) {
     console.error('[msg] Lỗi:', e.message);
   }
@@ -210,7 +210,7 @@ client.on(Events.InteractionCreate, async (i) => {
         const opt = i.options.getString('lang');
         const lang = opt && opt !== 'auto' ? opt : resolveLang(i.user.id, cfg, text);
         const u = getUser(i.user.id);
-        s.enqueue(text, lang, u.voiceId, u.engine);
+        s.enqueue(text, lang, u.voiceId, u.engine, u.ttsMode);
         return i.editReply(`🗣️ Đang đọc (${LANGS[lang]}).`);
       }
       case 'tts':
@@ -276,6 +276,18 @@ async function handleTTS(i, cfg, member) {
       flags: ephemeral,
     });
   }
+  if (sub === 'mode') {
+    const mode = i.options.getString('mode');
+    const label = mode === 'smooth' ? '🎭 Mượt mà & Hài hước (Một giọng)' : '🔀 Song ngữ đổi giọng Mỹ';
+    if (isAdmin(member) || isOwner(i.user.id)) {
+      cfg.ttsMode = mode;
+      await flushNow();
+      return i.reply({ content: `✅ Đã đặt kiểu đọc cho server: **${label}**`, flags: ephemeral });
+    }
+    getUser(i.user.id).ttsMode = mode;
+    await flushNow();
+    return i.reply({ content: `✅ Đã đặt kiểu đọc của bạn: **${label}**`, flags: ephemeral });
+  }
   if (sub === 'settings') {
     const currentVoiceId = cfg.voiceId || DEFAULT_VOICE_ID;
     const voiceLabel = voiceChoices.find((c) => c.value === currentVoiceId)?.name || 'Brian';
@@ -290,6 +302,11 @@ async function handleTTS(i, cfg, member) {
           inline: true,
         },
         {
+          name: 'Kiểu đọc tiếng Anh',
+          value: cfg.ttsMode === 'split' ? '🔀 Đổi giọng Mỹ' : '🎭 Mượt mà & Hài hước (Một giọng)',
+          inline: true,
+        },
+        {
           name: 'Giọng mặc định',
           value: cfg.defaultLang === 'auto' ? 'Tự động' : LANGS[cfg.defaultLang],
           inline: true,
@@ -297,7 +314,6 @@ async function handleTTS(i, cfg, member) {
         { name: 'Nhân vật giọng (nếu dùng ElevenLabs)', value: voiceLabel, inline: true },
         { name: 'Đọc tên', value: cfg.sayName ? 'Có' : 'Không', inline: true },
         { name: 'Tự vào voice', value: cfg.autoJoin ? 'Có' : 'Không', inline: true },
-        { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
         { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
         {
           name: 'Role được đọc',

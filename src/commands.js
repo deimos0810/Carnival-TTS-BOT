@@ -72,6 +72,21 @@ const tts = new SlashCommandBuilder()
           ),
       ),
   )
+  .addSubcommand((s) =>
+    s
+      .setName('mode')
+      .setDescription('Chọn kiểu đọc tiếng Anh trong câu tiếng Việt')
+      .addStringOption((o) =>
+        o
+          .setName('mode')
+          .setDescription('Kiểu đọc')
+          .setRequired(true)
+          .addChoices(
+            { name: '🎭 Mượt mà & Hài hước (Việt hoá tiếng Anh, không đổi tông giật cục - Khuyên dùng)', value: 'smooth' },
+            { name: '🔀 Song ngữ đổi giọng (Chuyển sang giọng Mỹ khi đọc từ tiếng Anh)', value: 'split' },
+          ),
+      ),
+  )
   .addSubcommand((s) => s.setName('settings').setDescription('Xem cài đặt TTS của server'))
   .addSubcommand((s) =>
     s
