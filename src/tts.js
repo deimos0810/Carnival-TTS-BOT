@@ -181,7 +181,8 @@ const VI_SLANG = {
   lmj: 'làm gì', lsao: 'làm sao', ntn: 'như thế nào',
   // đại từ / người
   mn: 'mọi người', mng: 'mọi người', ae: 'anh em', mik: 'mình', mk: 'mình', mh: 'mình',
-  e: 'em', a: 'anh', m: 'mày', t: 'tao', ny: 'người yêu', nyc: 'người yêu cũ', ck: 'chồng', vk: 'vợ', bme: 'bố mẹ',
+  e: 'em', a: 'anh', m: 'mày', t: 'tao', thg: 'thằng', th: 'thằng', cno: 'chúng nó', bno: 'bọn nó', tno: 'tụi nó',
+  ny: 'người yêu', nyc: 'người yêu cũ', ck: 'chồng', vk: 'vợ', bme: 'bố mẹ',
   ng: 'người', nguoi: 'người', bn: 'bạn',
   // trạng từ / nối
   vs: 'với', r: 'rồi', rùi: 'rồi', rầu: 'rồi', cx: 'cũng', cg: 'cũng', nx: 'nữa',
@@ -189,6 +190,7 @@ const VI_SLANG = {
   bh: 'bây giờ', bjo: 'bây giờ', h: 'giờ', hnay: 'hôm nay', hqua: 'hôm qua', hum: 'hôm',
   thui: 'thôi', thùi: 'thôi', đag: 'đang', dag: 'đang', ik: 'đi', ak: 'à', ah: 'à',
   pk: 'phải không', pải: 'phải', fải: 'phải', tr: 'trời', trùi: 'trời', chời: 'trời', oi: 'ơi',
+  dau: 'đâu',
   // động từ
   bt: 'biết', bik: 'biết', ns: 'nói', nt: 'nhắn tin', tn: 'tin nhắn', tl: 'trả lời',
   thik: 'thích', thic: 'thích', iu: 'yêu', yeu: 'yêu', hc: 'học',
@@ -197,13 +199,15 @@ const VI_SLANG = {
   kq: 'kết quả', vd: 'ví dụ', ib: 'inbox',
   // cảm thán GenZ
   vl: 'vãi', vcl: 'vãi cả lúa', vkl: 'vãi cả lúa', vch: 'vãi chưởng', sml: 'sấp mặt luôn',
+  đm: 'đậu má', dm: 'đậu má', duma: 'đậu má', đuma: 'đậu má',
+  clgt: 'cái lề gì thốn', tđn: 'thế đéo nào', tdn: 'thế đéo nào',
   chằm: 'trầm', kẻm: 'cảm', chớt: 'chết',
 };
 
 /** Teencode chắc chắn là tiếng Việt -> dùng để đoán câu không dấu là tiếng Việt */
 const VI_SLANG_STRONG = new Set([
   'ko', 'kh', 'khg', 'khum', 'hok', 'hong', 'kb', 'kbt', 'kp', 'kcj', 'dc', 'dk', 'lmj', 'lsao', 'ntn', 'mn',
-  'mng', 'ae', 'mik', 'mk', 'ny', 'nyc', 'vk', 'ck', 'vs', 'cx', 'cg', 'nx', 'nma', 'nhma', 'trc', 'thui',
+  'mng', 'ae', 'mik', 'mk', 'thg', 'ny', 'nyc', 'vk', 'ck', 'vs', 'cx', 'cg', 'nx', 'nma', 'nhma', 'trc', 'thui',
   'bik', 'thik', 'iu', 'vl', 'vcl', 'vkl', 'vch', 'sml', 'hnay', 'hqua', 'bjo', 'dag', 'pk',
 ]);
 
@@ -236,7 +240,53 @@ function isVietSyllable(w) {
 }
 
 /**
- * Tách văn bản thành các đoạn liên tiếp cùng ngôn ngữ.
+ * Chuẩn hoá toàn bộ câu văn trước khi gửi tới TTS:
+ *  - Mở rộng slang/teencode (thg -> thằng, tbh -> to be honest, ye -> de,...)
+ *  - Áp dụng từ điển tuỳ chỉnh của server
+ *  - Đọc mặt cười/tiếng cười thành chữ tự nhiên
+ * Giữ nguyên cấu trúc câu liền mạch để AI TTS đọc tròn vành rõ chữ, đều nhịp!
+ */
+export function normalizeTextForSpeech(text, baseLang = 'vi', customDict = {}) {
+  const dict = { ...BUILTIN_DICT, ...customDict };
+  // Xử lý cụm từ đặc biệt
+  let t = text
+    .replace(/\bno\s+cap\b/gi, 'no cap')
+    .replace(/\bthg\s+n([aàáạảãâầấậẩẫăằắặẳẵeèéẹẻẽêềếệểễoòóọỏõôồốộổỗơờớợởỡuùúụủũưừứựửữiìíịỉĩyỳýỵỷỹ])\b/gi, 'thằng n$1')
+    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
+
+  const words = t.split(/\s+/).filter(Boolean);
+  const result = [];
+
+  for (const raw of words) {
+    const m = raw.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}'’.-]*?[\p{L}\p{N}]|[\p{L}\p{N}]?)([^\p{L}\p{N}]*)$/u);
+    if (!m || !m[2]) {
+      result.push(raw);
+      continue;
+    }
+    const [, pre, core, post] = m;
+    const lower = core.toLowerCase();
+    let short = collapse(lower);
+    if (short.length < 2) short = lower;
+
+    const entry = dict[lower] ?? dict[short];
+    const slang = baseLang === 'vi' ? (VI_SLANG[lower] ?? VI_SLANG[short]) : undefined;
+
+    if (entry) {
+      result.push(`${pre}${entry.say}${post}`);
+    } else if (LAUGH.test(lower)) {
+      result.push(`${pre}ha ha ha${post}`);
+    } else if (slang) {
+      result.push(`${pre}${slang}${post}`);
+    } else {
+      result.push(raw);
+    }
+  }
+
+  return result.join(' ');
+}
+
+/**
+ * Tách văn bản thành các đoạn liên tiếp cùng ngôn ngữ (dùng cho Google TTS fallback).
  * @param {string} text
  * @param {'vi'|'en'} baseLang  ngôn ngữ chính của câu
  * @param {Record<string,{say:string,lang:string}>} customDict  từ điển riêng của server
@@ -303,22 +353,31 @@ export function segmentText(text, baseLang = 'vi', customDict = {}) {
 }
 
 // ======================================================================
-//  ENGINE: ElevenLabs (giọng Adam)
+//  ENGINE: ElevenLabs
 // ======================================================================
 
-const ADAM_VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
+export const VOICES = {
+  brian: { name: 'Brian (Trầm ấm, rõ chữ nhất - Khuyên dùng)', id: 'nPczCjzI2devNBz1zQrb' },
+  daniel: { name: 'Daniel (Phát thanh viên, tròn vành rõ chữ)', id: 'onwK4e9ZLuTAKqWW03F9' },
+  adam: { name: 'Adam (Nam trầm)', id: 'pNInz6obpgDQGcFmaJgB' },
+  liam: { name: 'Liam (Nam trẻ, tự nhiên)', id: 'TX3LPaxmHKxFdv7VOQHJ' },
+  george: { name: 'George (Nam ấm áp)', id: 'JBFqnCBsd6RMkjVDRZzb' },
+};
+
+export const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || VOICES.brian.id;
 const num = (v, d) => (v === undefined || v === '' || Number.isNaN(Number(v)) ? d : Number(v));
 
-/** Cấu hình riêng cho từng ngôn ngữ -> tông giọng khác nhau khi đổi Việt/Anh */
-function voiceProfile(lang) {
+/** Cấu hình giọng đọc và tối ưu thông số để phát âm rõ chữ, đều nhịp */
+function voiceProfile(lang, customVoiceId) {
   const L = lang.toUpperCase();
   const env = process.env;
-  const defaults =
-    lang === 'vi'
-      ? { stability: 0.55, similarity: 0.8, style: 0, speed: 1.0 }
-      : { stability: 0.4, similarity: 0.75, style: 0.15, speed: 1.0 };
+  // stability = 0.65 giúp giữ nhịp đều, không bị lúc nhanh lúc chậm
+  // similarity = 0.85 giúp phát âm rõ âm điệu, tròn vành rõ chữ tiếng Việt
+  // style = 0.0 loại bỏ cảm xúc kịch tính gây nói vấp
+  const defaults = { stability: 0.65, similarity: 0.85, style: 0.0, speed: 1.0 };
+  const voiceId = customVoiceId || env[`ELEVENLABS_VOICE_${L}`] || env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID;
   return {
-    voiceId: env[`ELEVENLABS_VOICE_${L}`] || env.ELEVENLABS_VOICE_ID || ADAM_VOICE_ID,
+    voiceId,
     voice_settings: {
       stability: num(env[`ELEVENLABS_STABILITY_${L}`], defaults.stability),
       similarity_boost: num(env[`ELEVENLABS_SIMILARITY_${L}`], defaults.similarity),
@@ -347,21 +406,22 @@ async function withSlot(fn) {
   }
 }
 
-async function elevenLabs(text, lang, attempt = 0) {
+async function elevenLabs(text, lang, customVoiceId, attempt = 0) {
   try {
-    return await withSlot(() => elevenLabsOnce(text, lang));
+    return await withSlot(() => elevenLabsOnce(text, lang, customVoiceId));
   } catch (e) {
     if (e.status === 429 && attempt < 3) {
       await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-      return elevenLabs(text, lang, attempt + 1);
+      return elevenLabs(text, lang, customVoiceId, attempt + 1);
     }
     throw e;
   }
 }
 
-async function elevenLabsOnce(text, lang) {
-  const { voiceId, voice_settings } = voiceProfile(lang);
-  const model = process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5';
+async function elevenLabsOnce(text, lang, customVoiceId) {
+  const { voiceId, voice_settings } = voiceProfile(lang, customVoiceId);
+  // Dùng eleven_multilingual_v2 để phát âm tiếng Việt chuẩn xác nhất
+  const model = process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2';
   const key = `${voiceId}|${model}|${lang}|${JSON.stringify(voice_settings)}|${text}`;
   if (cache.has(key)) {
     const buf = cache.get(key);
@@ -379,7 +439,7 @@ async function elevenLabsOnce(text, lang) {
         'Content-Type': 'application/json',
         Accept: 'audio/mpeg',
       },
-      body: JSON.stringify({ text, model_id: model, language_code: lang, voice_settings }),
+      body: JSON.stringify({ text, model_id: model, voice_settings }),
       signal: AbortSignal.timeout(15000),
     },
   );
@@ -410,27 +470,34 @@ async function google(text, lang) {
   return Buffer.concat(parts.map((p) => Buffer.from(p.base64, 'base64')));
 }
 
-export const engineName = () => (process.env.ELEVENLABS_API_KEY ? 'ElevenLabs (Adam)' : 'Google');
+export const engineName = () => (process.env.ELEVENLABS_API_KEY ? 'ElevenLabs (Brian / Adam)' : 'Google');
 
 /**
- * Chuyển văn bản thành 1 buffer MP3. Tự tách đoạn Việt / Anh,
- * mỗi đoạn đọc bằng giọng & tông riêng rồi ghép lại.
+ * Chuyển văn bản thành 1 buffer MP3.
+ * Khi dùng ElevenLabs: chuẩn hoá slang/teencode rồi đọc nguyên câu liền mạch, giữ nhịp điệu đều đặn.
+ * Khi dùng Google TTS fallback: chia đoạn theo ngôn ngữ để Google không bị lỗi.
  * @param {string} text
  * @param {'vi'|'en'} lang  ngôn ngữ chính
- * @param {{dict?: Record<string,{say:string,lang:string}>}} [opts]
+ * @param {{dict?: Record<string,{say:string,lang:string}>, voiceId?: string}} [opts]
  */
 export async function synthesize(text, lang = 'vi', opts = {}) {
-  const segments = segmentText(text, lang, opts.dict);
-  if (!segments.length) throw new Error('Không có gì để đọc');
+  const dict = opts.dict || {};
 
   if (process.env.ELEVENLABS_API_KEY) {
     try {
-      const bufs = await Promise.all(segments.map((s) => elevenLabs(s.text, s.lang)));
-      return Buffer.concat(bufs);
+      // 1. Chuẩn hoá teencode, slang và từ điển server thành câu liền mạch
+      const normalized = normalizeTextForSpeech(text, lang, dict);
+      if (!normalized.trim()) throw new Error('Không có gì để đọc');
+      // 2. Tạo âm thanh một lần duy nhất cho toàn câu -> nhịp điệu mượt mà, không bị giật cục
+      return await elevenLabs(normalized, lang, opts.voiceId);
     } catch (e) {
-      console.warn('[tts] ElevenLabs lỗi, chuyển sang Google:', e.message);
+      console.warn('[tts] ElevenLabs lỗi, chuyển sang Google fallback:', e.message);
     }
   }
+
+  // Google TTS fallback: bắt buộc phải tách từng đoạn vì Google Translate không tự nhận đa ngữ
+  const segments = segmentText(text, lang, dict);
+  if (!segments.length) throw new Error('Không có gì để đọc');
   const bufs = await Promise.all(segments.map((s) => google(s.text, s.lang)));
   return Buffer.concat(bufs);
 }

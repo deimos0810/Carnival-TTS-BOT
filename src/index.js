@@ -9,9 +9,9 @@ import {
 } from 'discord.js';
 import { startServer } from './server.js';
 import { initStore, getGuild, getUser, save, flushNow, state } from './store.js';
-import { commandData } from './commands.js';
+import { commandData, voiceChoices } from './commands.js';
 import { getSession, joinChannel, leave, sessionCount } from './voice.js';
-import { detectLang, LANGS, BUILTIN_DICT, engineName } from './tts.js';
+import { detectLang, LANGS, BUILTIN_DICT, engineName, DEFAULT_VOICE_ID } from './tts.js';
 import {
   findValue,
   searchValues,
@@ -155,7 +155,7 @@ client.on(Events.MessageCreate, async (msg) => {
       else return;
     }
     if (cfg.sayName) text = `${member.displayName} ${lang === 'vi' ? 'nói' : 'said'}: ${text}`;
-    session.enqueue(text, lang);
+    session.enqueue(text, lang, getUser(msg.author.id).voiceId);
   } catch (e) {
     console.error('[msg] Lỗi:', e.message);
   }
@@ -208,7 +208,7 @@ client.on(Events.InteractionCreate, async (i) => {
         const text = i.options.getString('text');
         const opt = i.options.getString('lang');
         const lang = opt && opt !== 'auto' ? opt : resolveLang(i.user.id, cfg, text);
-        s.enqueue(text, lang);
+        s.enqueue(text, lang, getUser(i.user.id).voiceId);
         return i.editReply(`🗣️ Đang đọc (${LANGS[lang]}).`);
       }
       case 'tts':
@@ -241,7 +241,31 @@ async function handleTTS(i, cfg, member) {
       flags: ephemeral,
     });
   }
+  if (sub === 'character') {
+    const voiceId = i.options.getString('voice');
+    getUser(i.user.id).voiceId = voiceId;
+    await flushNow();
+    const vName = voiceChoices.find((c) => c.value === voiceId)?.name || voiceId;
+    return i.reply({
+      content: `✅ Nhân vật giọng đọc của bạn: **${vName}**`,
+      flags: ephemeral,
+    });
+  }
+  if (sub === 'servervoice') {
+    if (!isAdmin(member) && !isOwner(i.user.id))
+      return i.reply({ content: '❌ Cần quyền **Manage Server**.', flags: ephemeral });
+    const voiceId = i.options.getString('voice');
+    cfg.voiceId = voiceId;
+    await flushNow();
+    const vName = voiceChoices.find((c) => c.value === voiceId)?.name || voiceId;
+    return i.reply({
+      content: `✅ Nhân vật giọng mặc định của server: **${vName}**`,
+      flags: ephemeral,
+    });
+  }
   if (sub === 'settings') {
+    const currentVoiceId = cfg.voiceId || DEFAULT_VOICE_ID;
+    const voiceLabel = voiceChoices.find((c) => c.value === currentVoiceId)?.name || 'Brian';
     const e = new EmbedBuilder()
       .setColor(0x5865f2)
       .setTitle('⚙️ Cài đặt TTS')
@@ -252,6 +276,7 @@ async function handleTTS(i, cfg, member) {
           value: cfg.defaultLang === 'auto' ? 'Tự động' : LANGS[cfg.defaultLang],
           inline: true,
         },
+        { name: 'Nhân vật giọng', value: voiceLabel, inline: true },
         { name: 'Đọc tên', value: cfg.sayName ? 'Có' : 'Không', inline: true },
         { name: 'Tự vào voice', value: cfg.autoJoin ? 'Có' : 'Không', inline: true },
         { name: 'Engine', value: engineName(), inline: true },

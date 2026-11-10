@@ -6,6 +6,14 @@ const langChoices = [
   { name: 'Tiếng Việt', value: 'vi' },
 ];
 
+export const voiceChoices = [
+  { name: '🌟 Brian (Trầm ấm, rõ chữ nhất - Khuyên dùng)', value: 'nPczCjzI2devNBz1zQrb' },
+  { name: '🎙️ Daniel (Phát thanh viên, tròn vành rõ chữ)', value: 'onwK4e9ZLuTAKqWW03F9' },
+  { name: '🧔 Adam (Nam trầm)', value: 'pNInz6obpgDQGcFmaJgB' },
+  { name: '⚡ Liam (Nam trẻ, tự nhiên)', value: 'TX3LPaxmHKxFdv7VOQHJ' },
+  { name: '🎩 George (Nam ấm áp)', value: 'JBFqnCBsd6RMkjVDRZzb' },
+];
+
 const categoryChoices = [
   { name: '📦 Tất cả', value: 'all' },
   { name: '🎮 Gamepass & Bundle', value: 'gamepass' },
@@ -32,6 +40,22 @@ const tts = new SlashCommandBuilder()
       .setName('voice')
       .setDescription('Chọn giọng đọc cho bản thân')
       .addStringOption((o) => o.setName('lang').setDescription('Giọng').setRequired(true).addChoices(...langChoices)),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('character')
+      .setDescription('Chọn nhân vật giọng đọc cho bản thân')
+      .addStringOption((o) =>
+        o.setName('voice').setDescription('Nhân vật giọng').setRequired(true).addChoices(...voiceChoices),
+      ),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('servervoice')
+      .setDescription('[Admin] Đổi nhân vật giọng đọc mặc định của server')
+      .addStringOption((o) =>
+        o.setName('voice').setDescription('Nhân vật giọng').setRequired(true).addChoices(...voiceChoices),
+      ),
   )
   .addSubcommand((s) => s.setName('settings').setDescription('Xem cài đặt TTS của server'))
   .addSubcommand((s) =>

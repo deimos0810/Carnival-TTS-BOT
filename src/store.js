@@ -116,11 +116,12 @@ export function getGuild(id) {
   g.autoJoin ??= true;
   g.ignorePrefix ??= '//';
   g.maxLength ??= 300;
+  g.voiceId ??= null; // ID giọng đọc riêng của server
   g.dict ??= {}; // từ điển phát âm riêng: { word: { say, lang } }
   return g;
 }
 
 export function getUser(id) {
-  state.users[id] ??= { lang: null };
+  state.users[id] ??= { lang: null, voiceId: null };
   return state.users[id];
 }
