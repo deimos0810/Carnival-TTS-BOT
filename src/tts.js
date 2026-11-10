@@ -296,8 +296,15 @@ export function segmentText(text, baseLang = 'vi', customDict = {}) {
   const dict = { ...BUILTIN_DICT, ...customDict };
   const tokens = []; // { text, lang|null }
 
-  // Cụm từ nhiều chữ -> gộp thành 1 từ để tra từ điển
-  text = text.replace(/\bno\s+cap\b/gi, 'nocap').replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
+  // Cụm từ tiếng Anh nhiều chữ -> chuyển về viết tắt để gán chuẩn lang 'en'
+  text = text
+    .replace(/\bto\s+be\s+honest\b/gi, 'tbh')
+    .replace(/\bby\s+the\s+way\b/gi, 'btw')
+    .replace(/\bfor\s+real\b/gi, 'fr')
+    .replace(/\bnot\s+gonna\s+lie\b/gi, 'ngl')
+    .replace(/\bin\s+my\s+opinion\b/gi, 'imo')
+    .replace(/\bno\s+cap\b/gi, 'nocap')
+    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
   for (const raw of text.split(/\s+/).filter(Boolean)) {
     const m = raw.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}'’.-]*?[\p{L}\p{N}]|[\p{L}\p{N}]?)([^\p{L}\p{N}]*)$/u);
     if (!m || !m[2]) {
@@ -470,32 +477,34 @@ async function google(text, lang) {
   return Buffer.concat(parts.map((p) => Buffer.from(p.base64, 'base64')));
 }
 
-export const engineName = () => (process.env.ELEVENLABS_API_KEY ? 'ElevenLabs (Brian / Adam)' : 'Google');
+export const engineName = (engine = 'google') =>
+  engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY
+    ? 'ElevenLabs (Brian / Adam)'
+    : 'Google (Thuần Việt 100% + Đọc tiếng Anh)';
 
 /**
  * Chuyển văn bản thành 1 buffer MP3.
- * Khi dùng ElevenLabs: chuẩn hoá slang/teencode rồi đọc nguyên câu liền mạch, giữ nhịp điệu đều đặn.
- * Khi dùng Google TTS fallback: chia đoạn theo ngôn ngữ để Google không bị lỗi.
+ * - Mặc định: Google TTS (Thuần Việt 100%, đọc "ngu" chuẩn "ngu", tự chuyển giọng đọc từ tiếng Anh)
+ * - Tuỳ chọn: ElevenLabs (Giọng phương Tây nếu server chọn)
  * @param {string} text
  * @param {'vi'|'en'} lang  ngôn ngữ chính
- * @param {{dict?: Record<string,{say:string,lang:string}>, voiceId?: string}} [opts]
+ * @param {{dict?: Record<string,{say:string,lang:string}>, engine?: string, voiceId?: string}} [opts]
  */
 export async function synthesize(text, lang = 'vi', opts = {}) {
   const dict = opts.dict || {};
+  const engine = opts.engine || 'google';
 
-  if (process.env.ELEVENLABS_API_KEY) {
+  if (engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
     try {
-      // 1. Chuẩn hoá teencode, slang và từ điển server thành câu liền mạch
       const normalized = normalizeTextForSpeech(text, lang, dict);
       if (!normalized.trim()) throw new Error('Không có gì để đọc');
-      // 2. Tạo âm thanh một lần duy nhất cho toàn câu -> nhịp điệu mượt mà, không bị giật cục
       return await elevenLabs(normalized, lang, opts.voiceId);
     } catch (e) {
       console.warn('[tts] ElevenLabs lỗi, chuyển sang Google fallback:', e.message);
     }
   }
 
-  // Google TTS fallback: bắt buộc phải tách từng đoạn vì Google Translate không tự nhận đa ngữ
+  // Google TTS: Thuần Việt 100% cho tiếng Việt, tự đổi sang English voice cho từ tiếng Anh
   const segments = segmentText(text, lang, dict);
   if (!segments.length) throw new Error('Không có gì để đọc');
   const bufs = await Promise.all(segments.map((s) => google(s.text, s.lang)));

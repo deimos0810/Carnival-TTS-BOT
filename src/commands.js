@@ -57,6 +57,21 @@ const tts = new SlashCommandBuilder()
         o.setName('voice').setDescription('Nhân vật giọng').setRequired(true).addChoices(...voiceChoices),
       ),
   )
+  .addSubcommand((s) =>
+    s
+      .setName('engine')
+      .setDescription('[Admin] Chọn bộ đọc: Google (Thuần Việt 100%) hoặc ElevenLabs (Giọng Tây)')
+      .addStringOption((o) =>
+        o
+          .setName('engine')
+          .setDescription('Bộ đọc âm thanh')
+          .setRequired(true)
+          .addChoices(
+            { name: '🇻🇳 Google (Thuần Việt 100% + Đọc tiếng Anh chuẩn - Khuyên dùng)', value: 'google' },
+            { name: '🎙️ ElevenLabs (Giọng nam trầm phương Tây Adam/Brian)', value: 'elevenlabs' },
+          ),
+      ),
+  )
   .addSubcommand((s) => s.setName('settings').setDescription('Xem cài đặt TTS của server'))
   .addSubcommand((s) =>
     s

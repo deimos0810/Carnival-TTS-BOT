@@ -155,7 +155,8 @@ client.on(Events.MessageCreate, async (msg) => {
       else return;
     }
     if (cfg.sayName) text = `${member.displayName} ${lang === 'vi' ? 'nói' : 'said'}: ${text}`;
-    session.enqueue(text, lang, getUser(msg.author.id).voiceId);
+    const u = getUser(msg.author.id);
+    session.enqueue(text, lang, u.voiceId, u.engine);
   } catch (e) {
     console.error('[msg] Lỗi:', e.message);
   }
@@ -208,7 +209,8 @@ client.on(Events.InteractionCreate, async (i) => {
         const text = i.options.getString('text');
         const opt = i.options.getString('lang');
         const lang = opt && opt !== 'auto' ? opt : resolveLang(i.user.id, cfg, text);
-        s.enqueue(text, lang, getUser(i.user.id).voiceId);
+        const u = getUser(i.user.id);
+        s.enqueue(text, lang, u.voiceId, u.engine);
         return i.editReply(`🗣️ Đang đọc (${LANGS[lang]}).`);
       }
       case 'tts':
@@ -263,6 +265,17 @@ async function handleTTS(i, cfg, member) {
       flags: ephemeral,
     });
   }
+  if (sub === 'engine') {
+    if (!isAdmin(member) && !isOwner(i.user.id))
+      return i.reply({ content: '❌ Cần quyền **Manage Server**.', flags: ephemeral });
+    const eng = i.options.getString('engine');
+    cfg.engine = eng;
+    await flushNow();
+    return i.reply({
+      content: `✅ Đã chuyển bộ đọc âm thanh sang: **${engineName(eng)}**`,
+      flags: ephemeral,
+    });
+  }
   if (sub === 'settings') {
     const currentVoiceId = cfg.voiceId || DEFAULT_VOICE_ID;
     const voiceLabel = voiceChoices.find((c) => c.value === currentVoiceId)?.name || 'Brian';
@@ -272,14 +285,19 @@ async function handleTTS(i, cfg, member) {
       .addFields(
         { name: 'Trạng thái', value: cfg.enabled ? '🟢 Bật' : '🔴 Tắt', inline: true },
         {
+          name: 'Bộ đọc (Engine)',
+          value: engineName(cfg.engine),
+          inline: true,
+        },
+        {
           name: 'Giọng mặc định',
           value: cfg.defaultLang === 'auto' ? 'Tự động' : LANGS[cfg.defaultLang],
           inline: true,
         },
-        { name: 'Nhân vật giọng', value: voiceLabel, inline: true },
+        { name: 'Nhân vật giọng (nếu dùng ElevenLabs)', value: voiceLabel, inline: true },
         { name: 'Đọc tên', value: cfg.sayName ? 'Có' : 'Không', inline: true },
         { name: 'Tự vào voice', value: cfg.autoJoin ? 'Có' : 'Không', inline: true },
-        { name: 'Engine', value: engineName(), inline: true },
+        { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
         { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
         {
           name: 'Role được đọc',

@@ -112,6 +112,7 @@ export function getGuild(id) {
   g.roleIds ??= [];
   g.channelIds ??= [];
   g.defaultLang ??= 'auto';
+  g.engine ??= 'google'; // 'google' (Thuần Việt 100%) hoặc 'elevenlabs' (Giọng Tây)
   g.sayName ??= false;
   g.autoJoin ??= true;
   g.ignorePrefix ??= '//';
@@ -122,6 +123,6 @@ export function getGuild(id) {
 }
 
 export function getUser(id) {
-  state.users[id] ??= { lang: null, voiceId: null };
+  state.users[id] ??= { lang: null, voiceId: null, engine: null };
   return state.users[id];
 }

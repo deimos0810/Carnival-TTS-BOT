@@ -59,10 +59,10 @@ class TTSSession {
     await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
   }
 
-  enqueue(text, lang, voiceId = null) {
+  enqueue(text, lang, voiceId = null, engine = null) {
     if (!text) return;
     if (this.queue.length >= MAX_QUEUE) this.queue.shift();
-    this.queue.push({ text, lang, voiceId });
+    this.queue.push({ text, lang, voiceId, engine });
     this.next();
   }
 
@@ -75,6 +75,7 @@ class TTSSession {
       const guildCfg = getGuild(this.guildId);
       const mp3 = await synthesize(item.text, item.lang, {
         dict: guildCfg.dict,
+        engine: item.engine || guildCfg.engine || 'google',
         voiceId: item.voiceId || guildCfg.voiceId,
       });
       const resource = createAudioResource(Readable.from([mp3]), { inputType: StreamType.Arbitrary });
