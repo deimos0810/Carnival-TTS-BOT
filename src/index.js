@@ -49,6 +49,7 @@ startServer(() => ({
   ready: client.isReady(),
   guilds: client.guilds.cache.size,
   voice: sessionCount(),
+  engine: engineName(),
   items: Object.keys(state.values || {}).length,
   lastSync: state.lastSync,
 }));
