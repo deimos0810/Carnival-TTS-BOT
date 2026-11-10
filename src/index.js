@@ -8,10 +8,10 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { startServer } from './server.js';
-import { initStore, getGuild, getUser, save, state } from './store.js';
+import { initStore, getGuild, getUser, save, flushNow, state } from './store.js';
 import { commandData } from './commands.js';
 import { getSession, joinChannel, leave, sessionCount } from './voice.js';
-import { detectLang, LANGS } from './tts.js';
+import { detectLang, LANGS, BUILTIN_DICT, engineName } from './tts.js';
 import {
   findValue,
   searchValues,
@@ -114,6 +114,8 @@ client.on(Events.GuildCreate, async (guild) => {
   try {
     await guild.commands.set(commandData);
     console.log(`[bot] Đã vào server mới và đăng ký lệnh: ${guild.name} (${guild.id})`);
+    getGuild(guild.id);
+    await flushNow();
   } catch (e) {
     console.warn(`[bot] Không thể đăng ký command cho server mới ${guild.name}:`, e.message);
   }
@@ -228,10 +230,11 @@ client.on(Events.InteractionCreate, async (i) => {
 
 async function handleTTS(i, cfg, member) {
   const sub = i.options.getSubcommand();
+  if (i.options.getSubcommandGroup() === 'word') return handleWord(i, cfg, member, sub);
   if (sub === 'voice') {
     const lang = i.options.getString('lang');
     getUser(i.user.id).lang = lang;
-    save();
+    await flushNow();
     return i.reply({
       content: `✅ Giọng của bạn: **${lang === 'auto' ? 'Tự động' : LANGS[lang]}**`,
       flags: ephemeral,
@@ -250,6 +253,7 @@ async function handleTTS(i, cfg, member) {
         },
         { name: 'Đọc tên', value: cfg.sayName ? 'Có' : 'Không', inline: true },
         { name: 'Tự vào voice', value: cfg.autoJoin ? 'Có' : 'Không', inline: true },
+        { name: 'Engine', value: engineName(), inline: true },
         { name: 'Bỏ qua tin bắt đầu bằng', value: `\`${cfg.ignorePrefix}\``, inline: true },
         {
           name: 'Role được đọc',
@@ -314,8 +318,45 @@ async function handleTTS(i, cfg, member) {
       reply = `✅ Tự vào voice: **${cfg.autoJoin ? 'Có' : 'Không'}**`;
       break;
   }
-  save();
+  await flushNow();
   return i.reply({ content: reply, flags: ephemeral });
+}
+
+async function handleWord(i, cfg, member, sub) {
+  if (sub === 'list') {
+    const fmt = ([w, e]) => `\`${w}\` → ${e.say} _(${e.lang})_`;
+    const custom = Object.entries(cfg.dict).map(fmt);
+    const builtin = Object.entries(BUILTIN_DICT)
+      .filter(([w]) => !cfg.dict[w])
+      .map(fmt);
+    const e = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle('📖 Từ điển phát âm')
+      .addFields(
+        { name: 'Của server', value: custom.join('\n').slice(0, 1024) || '_Chưa có — dùng `/tts word add`_' },
+        { name: 'Có sẵn', value: builtin.join('\n').slice(0, 1024) || '_Trống_' },
+      );
+    return i.reply({ embeds: [e], flags: ephemeral });
+  }
+
+  if (!isAdmin(member) && !isOwner(i.user.id))
+    return i.reply({ content: '❌ Cần quyền **Manage Server**.', flags: ephemeral });
+
+  const word = i.options.getString('word').trim().toLowerCase();
+  if (sub === 'add') {
+    const say = i.options.getString('say').trim();
+    const lang = i.options.getString('lang');
+    cfg.dict[word] = { say, lang };
+    await flushNow();
+    return i.reply({ content: `✅ \`${word}\` sẽ được đọc là **${say}** (${LANGS[lang]}).`, flags: ephemeral });
+  }
+  if (sub === 'remove') {
+    if (!cfg.dict[word])
+      return i.reply({ content: `❌ \`${word}\` không có trong từ điển của server.`, flags: ephemeral });
+    delete cfg.dict[word];
+    await flushNow();
+    return i.reply({ content: `✅ Đã xoá \`${word}\`.`, flags: ephemeral });
+  }
 }
 
 // ---------------- Value List Handlers ----------------
@@ -513,6 +554,27 @@ async function handleAutocomplete(i) {
       : [{ name: focused.slice(0, 100) || 'Gõ để tìm kiếm...', value: focused.slice(0, 100) || 'none' }],
   );
 }
+
+// ---------------- Shutdown Gracefully ----------------
+let isShuttingDown = false;
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[bot] Nhận tín hiệu ${signal}, đang lưu toàn bộ dữ liệu an toàn trước khi thoát...`);
+  try {
+    await flushNow();
+    console.log('[store] Đã lưu dữ liệu MongoDB & local backup thành công.');
+  } catch (err) {
+    console.error('[store] Lỗi khi lưu dữ liệu trước khi thoát:', err.message);
+  }
+  try {
+    client.destroy();
+  } catch {}
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // ---------------- Start ----------------
 process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));

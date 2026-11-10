@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gpo-tts-bot
+    name: carnival-tts-bot
     runtime: node
     plan: free
     region: singapore
@@ -17,5 +17,7 @@ services:
       - key: BOT_OWNER_ID
         sync: false
       - key: MONGODB_URI
+        sync: false
+      - key: ELEVENLABS_API_KEY
         sync: false
 

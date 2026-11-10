@@ -37,6 +37,11 @@ Bot Discord đa năng kết hợp:
 | `/tts toggle <enabled>` | Admin | Bật / tắt chức năng TTS |
 | `/tts sayname <enabled>` | Admin | Đọc tên người nói trước câu chat hay không |
 | `/tts autojoin <enabled>` | Admin | Bot tự vào voice khi người có role chat |
+| `/tts word add <word> <say> <lang>` | Admin | Thêm cách đọc cho một từ (vd: `ye` → `de`, giọng Việt) |
+| `/tts word remove <word>` | Admin | Xoá cách đọc đã thêm |
+| `/tts word list` | Mọi người | Xem từ điển phát âm |
+
+> 🎙️ **Giọng Adam (ElevenLabs):** đặt biến môi trường `ELEVENLABS_API_KEY` để dùng giọng Adam. Bot tự tách từng từ tiếng Việt / tiếng Anh trong câu và đọc mỗi đoạn với giọng + tông riêng (`language_code` vi/en). Không có key thì bot dùng giọng Google (vẫn tách Việt/Anh).
 
 ---
 

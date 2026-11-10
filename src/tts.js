@@ -7,13 +7,399 @@ export const LANGS = {
 
 const VI_CHARS = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
-/** Tự đoán ngôn ngữ: có dấu tiếng Việt => vi, ngược lại => en */
+/**
+ * Tự đoán ngôn ngữ chính của câu:
+ *  - có dấu tiếng Việt => vi
+ *  - không dấu nhưng có teencode Việt (ko, dc, mn...) hoặc phần lớn là âm tiết Việt => vi
+ *  - còn lại => en
+ */
 export function detectLang(text) {
-  return VI_CHARS.test(text) ? 'vi' : 'en';
+  if (VI_CHARS.test(text)) return 'vi';
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  if (!words.length) return 'en';
+  let vi = 0;
+  for (const raw of words) {
+    const w = collapse(raw);
+    if (BUILTIN_DICT[w] || BUILTIN_DICT[raw]) continue; // từ đã có cách đọc cố định -> không tính
+    if (VI_SLANG_STRONG.has(w) || VI_SLANG_STRONG.has(raw)) return 'vi';
+    if (!EN_COMMON.has(raw) && !EN_WORDS.has(raw) && isVietSyllable(raw)) vi++;
+  }
+  return words.length >= 2 && vi / words.length >= 0.6 ? 'vi' : 'en';
 }
 
-/** Chuyển văn bản thành 1 buffer MP3 (tự chia đoạn > 200 ký tự). */
-export async function synthesize(text, lang = 'vi') {
+/** Rút gọn ký tự lặp: "khummm" -> "khum", "okiii" -> "oki" */
+const collapse = (w) => w.replace(/(.)\1+/g, '$1');
+/** Tiếng cười: kkk, hahaha, hihihi, hjhjhj, hehehe... */
+const LAUGH = /^(?:k{3,}|(?:h[aeij]){3,}h?)$/i;
+
+// ======================================================================
+//  TỪ ĐIỂN PHÁT ÂM
+// ======================================================================
+
+/**
+ * Từ luôn được đọc theo cách chỉ định (mọi chế độ).
+ * say  = cách đọc, lang = giọng dùng để đọc.
+ * Admin có thể thêm/ghi đè bằng `/tts word add`.
+ */
+export const BUILTIN_DICT = {
+  // --- Theo yêu cầu ---
+  ye: { say: 'de', lang: 'vi' },
+  yeah: { say: 'yeah', lang: 'en' },
+  ok: { say: 'okay', lang: 'en' },
+  oke: { say: 'okay', lang: 'en' },
+  oki: { say: 'ô kê', lang: 'vi' },
+  okela: { say: 'ô kê la', lang: 'vi' },
+  okelah: { say: 'ô kê la', lang: 'vi' },
+
+  // --- Game ---
+  gg: { say: 'good game', lang: 'en' },
+  ggwp: { say: 'good game well played', lang: 'en' },
+  wp: { say: 'well played', lang: 'en' },
+  ez: { say: 'easy', lang: 'en' },
+  afk: { say: 'A F K', lang: 'en' },
+  brb: { say: 'be right back', lang: 'en' },
+  wfl: { say: 'win fair lose', lang: 'en' },
+  npc: { say: 'N P C', lang: 'en' },
+  op: { say: 'O P', lang: 'en' },
+  noob: { say: 'noob', lang: 'en' },
+  gl: { say: 'good luck', lang: 'en' },
+  hf: { say: 'have fun', lang: 'en' },
+
+  // --- Slang tiếng Anh (TikTok / Internet) ---
+  btw: { say: 'by the way', lang: 'en' },
+  idk: { say: "I don't know", lang: 'en' },
+  idc: { say: "I don't care", lang: 'en' },
+  lol: { say: 'lol', lang: 'en' },
+  lmao: { say: 'L M A O', lang: 'en' },
+  lmfao: { say: 'L M F A O', lang: 'en' },
+  rofl: { say: 'rolling on the floor laughing', lang: 'en' },
+  omg: { say: 'oh my god', lang: 'en' },
+  omfg: { say: 'oh my god', lang: 'en' },
+  wtf: { say: 'what the f', lang: 'en' },
+  wth: { say: 'what the hell', lang: 'en' },
+  tf: { say: 'the f', lang: 'en' },
+  fr: { say: 'for real', lang: 'en' },
+  frfr: { say: 'for real for real', lang: 'en' },
+  ngl: { say: 'not gonna lie', lang: 'en' },
+  tbh: { say: 'to be honest', lang: 'en' },
+  imo: { say: 'in my opinion', lang: 'en' },
+  imho: { say: 'in my humble opinion', lang: 'en' },
+  smh: { say: 'shaking my head', lang: 'en' },
+  irl: { say: 'in real life', lang: 'en' },
+  np: { say: 'no problem', lang: 'en' },
+  nvm: { say: 'never mind', lang: 'en' },
+  ikr: { say: 'I know right', lang: 'en' },
+  ily: { say: 'I love you', lang: 'en' },
+  ilysm: { say: 'I love you so much', lang: 'en' },
+  bff: { say: 'best friend forever', lang: 'en' },
+  bf: { say: 'boyfriend', lang: 'en' },
+  gf: { say: 'girlfriend', lang: 'en' },
+  rip: { say: 'R I P', lang: 'en' },
+  pov: { say: 'P O V', lang: 'en' },
+  fyp: { say: 'for you page', lang: 'en' },
+  xd: { say: 'X D', lang: 'en' },
+  goat: { say: 'goat', lang: 'en' },
+  sus: { say: 'sus', lang: 'en' },
+  bruh: { say: 'bruh', lang: 'en' },
+  bro: { say: 'bro', lang: 'en' },
+  sis: { say: 'sis', lang: 'en' },
+  cap: { say: 'cap', lang: 'en' },
+  nocap: { say: 'no cap', lang: 'en' },
+  gn: { say: 'good night', lang: 'en' },
+  gm: { say: 'good morning', lang: 'en' },
+  hbd: { say: 'happy birthday', lang: 'en' },
+  slay: { say: 'slay', lang: 'en' },
+  rizz: { say: 'rizz', lang: 'en' },
+  delulu: { say: 'delulu', lang: 'en' },
+  gyat: { say: 'gyat', lang: 'en' },
+  skibidi: { say: 'skibidi', lang: 'en' },
+  sigma: { say: 'sigma', lang: 'en' },
+  mewing: { say: 'mewing', lang: 'en' },
+  aura: { say: 'aura', lang: 'en' },
+  cringe: { say: 'cringe', lang: 'en' },
+  vibe: { say: 'vibe', lang: 'en' },
+  chill: { say: 'chill', lang: 'en' },
+  flex: { say: 'flex', lang: 'en' },
+  crush: { say: 'crush', lang: 'en' },
+  simp: { say: 'simp', lang: 'en' },
+  toxic: { say: 'toxic', lang: 'en' },
+  drama: { say: 'drama', lang: 'en' },
+  trend: { say: 'trend', lang: 'en' },
+  idol: { say: 'idol', lang: 'en' },
+  fan: { say: 'fan', lang: 'en' },
+  pls: { say: 'please', lang: 'en' },
+  plz: { say: 'please', lang: 'en' },
+  pliz: { say: 'please', lang: 'en' },
+  thx: { say: 'thanks', lang: 'en' },
+  tks: { say: 'thanks', lang: 'en' },
+  thks: { say: 'thanks', lang: 'en' },
+  ty: { say: 'thank you', lang: 'en' },
+  tysm: { say: 'thank you so much', lang: 'en' },
+  sr: { say: 'sorry', lang: 'en' },
+  sry: { say: 'sorry', lang: 'en' },
+  ib: { say: 'inbox', lang: 'en' },
+  rep: { say: 'rep', lang: 'en' },
+  cmt: { say: 'comment', lang: 'en' },
+  fb: { say: 'facebook', lang: 'en' },
+  ig: { say: 'instagram', lang: 'en' },
+  yt: { say: 'youtube', lang: 'en' },
+  tiktok: { say: 'tiktok', lang: 'en' },
+  fl: { say: 'follow', lang: 'en' },
+  acc: { say: 'account', lang: 'en' },
+  ad: { say: 'admin', lang: 'en' },
+
+  // --- Cười / cảm thán ---
+  kk: { say: 'ha ha', lang: 'vi' },
+  kkk: { say: 'ha ha ha', lang: 'vi' },
+  haha: { say: 'ha ha', lang: 'vi' },
+  hahaha: { say: 'ha ha ha', lang: 'vi' },
+  hihi: { say: 'hi hi', lang: 'vi' },
+  hehe: { say: 'hê hê', lang: 'vi' },
+  huhu: { say: 'hu hu', lang: 'vi' },
+  hjhj: { say: 'hi hi', lang: 'vi' },
+  mlem: { say: 'mờ lem', lang: 'vi' },
+  uk: { say: 'ừ', lang: 'vi' },
+  uh: { say: 'ừ', lang: 'vi' },
+  um: { say: 'ừm', lang: 'vi' },
+  uhm: { say: 'ừm', lang: 'vi' },
+  oce: { say: 'ô kê', lang: 'vi' },
+  xl: { say: 'xin lỗi', lang: 'vi' },
+};
+
+/**
+ * Teencode / slang GenZ tiếng Việt — chỉ áp dụng khi câu đang là tiếng Việt
+ * (ví dụ trong câu tiếng Anh "r" vẫn đọc là "R").
+ */
+const VI_SLANG = {
+  // phủ định
+  k: 'không', ko: 'không', kh: 'không', khg: 'không', kg: 'không', khum: 'không', hok: 'không',
+  hong: 'không', hông: 'không', hem: 'không', hk: 'không', khong: 'không',
+  kb: 'không biết', kbt: 'không biết', kp: 'không phải', kcj: 'không có gì',
+  // được / gì / vậy
+  dc: 'được', đc: 'được', dk: 'được', đk: 'được', duoc: 'được',
+  j: 'gì', z: 'vậy', v: 'vậy', dzay: 'vậy', zay: 'vậy', zậy: 'vậy', dzị: 'vậy', zị: 'vậy',
+  lmj: 'làm gì', lsao: 'làm sao', ntn: 'như thế nào',
+  // đại từ / người
+  mn: 'mọi người', mng: 'mọi người', ae: 'anh em', mik: 'mình', mk: 'mình', mh: 'mình',
+  e: 'em', a: 'anh', m: 'mày', t: 'tao', ny: 'người yêu', nyc: 'người yêu cũ', ck: 'chồng', vk: 'vợ', bme: 'bố mẹ',
+  ng: 'người', nguoi: 'người', bn: 'bạn',
+  // trạng từ / nối
+  vs: 'với', r: 'rồi', rùi: 'rồi', rầu: 'rồi', cx: 'cũng', cg: 'cũng', nx: 'nữa',
+  nma: 'nhưng mà', nhma: 'nhưng mà', trc: 'trước', ms: 'mới', lm: 'làm',
+  bh: 'bây giờ', bjo: 'bây giờ', h: 'giờ', hnay: 'hôm nay', hqua: 'hôm qua', hum: 'hôm',
+  thui: 'thôi', thùi: 'thôi', đag: 'đang', dag: 'đang', ik: 'đi', ak: 'à', ah: 'à',
+  pk: 'phải không', pải: 'phải', fải: 'phải', tr: 'trời', trùi: 'trời', chời: 'trời', oi: 'ơi',
+  // động từ
+  bt: 'biết', bik: 'biết', ns: 'nói', nt: 'nhắn tin', tn: 'tin nhắn', tl: 'trả lời',
+  thik: 'thích', thic: 'thích', iu: 'yêu', yeu: 'yêu', hc: 'học',
+  // khác
+  nc: 'nước', đt: 'điện thoại', hs: 'học sinh', sv: 'sinh viên', gv: 'giáo viên',
+  kq: 'kết quả', vd: 'ví dụ', ib: 'inbox',
+  // cảm thán GenZ
+  vl: 'vãi', vcl: 'vãi cả lúa', vkl: 'vãi cả lúa', vch: 'vãi chưởng', sml: 'sấp mặt luôn',
+  chằm: 'trầm', kẻm: 'cảm', chớt: 'chết',
+};
+
+/** Teencode chắc chắn là tiếng Việt -> dùng để đoán câu không dấu là tiếng Việt */
+const VI_SLANG_STRONG = new Set([
+  'ko', 'kh', 'khg', 'khum', 'hok', 'hong', 'kb', 'kbt', 'kp', 'kcj', 'dc', 'dk', 'lmj', 'lsao', 'ntn', 'mn',
+  'mng', 'ae', 'mik', 'mk', 'ny', 'nyc', 'vk', 'ck', 'vs', 'cx', 'cg', 'nx', 'nma', 'nhma', 'trc', 'thui',
+  'bik', 'thik', 'iu', 'vl', 'vcl', 'vkl', 'vch', 'sml', 'hnay', 'hqua', 'bjo', 'dag', 'pk',
+]);
+
+/** Từ tiếng Anh phổ biến trông giống âm tiết Việt — dùng khi đoán ngôn ngữ câu không dấu */
+const EN_COMMON = new Set([
+  'a', 'i', 'to', 'go', 'do', 'so', 'no', 'me', 'he', 'be', 'by', 'my', 'in', 'on', 'an', 'at', 'it',
+  'can', 'man', 'hot', 'top', 'long', 'thing', 'sing', 'king', 'ring', 'big', 'bit', 'but', 'cut', 'hit',
+  'let', 'lot', 'not', 'get', 'got', 'put', 'set', 'sit', 'ten', 'tin', 'tip', 'pin', 'pan', 'pen', 'map',
+  'mom', 'dad', 'hi', 'oh', 'the', 'up', 'us', 'am', 'and', 'nice', 'game', 'time', 'come', 'home',
+]);
+
+/**
+ * Các từ không dấu trông giống âm tiết Việt nhưng gần như chắc chắn là tiếng Anh
+ * khi xuất hiện trong câu tiếng Việt.
+ */
+const EN_WORDS = new Set([
+  // (từ như "cho", "me", "no", "so", "ban", "can" cố ý KHÔNG có ở đây -> ưu tiên đọc tiếng Việt)
+  'hi', 'oh', 'the', 'chat', 'mic', 'top', 'map', 'hot', 'yo', 'team', 'unit', 'tag', 'bot', 'mod', 'code', 'link', 'pass', 'win', 'lose', 'my', 'bye', 'yes',
+]);
+
+// Kiểm tra 1 từ không dấu có phải âm tiết tiếng Việt hợp lệ không
+const VI_INITIAL = '(?:ngh|ng|nh|ch|gh|gi|kh|ph|qu|th|tr|[bcdghklmnprstvx])?';
+const VI_OPEN = 'a|e|i|o|u|y|ai|ao|au|ay|eo|eu|ia|iu|oa|oe|oi|ua|ue|ui|uu|uy|ya|ieu|yeu|oai|oay|oeo|uay|uoi|uou|uya|uyu|uoi';
+const VI_CLOSED_NUC = 'a|e|i|o|u|y|oa|oe|uy|ie|ye|uo|uye|oo|ua|ua|ue';
+const VI_FINAL = 'ch|ng|nh|[cmnpt]';
+const VI_SYLLABLE = new RegExp(`^${VI_INITIAL}(?:(?:${VI_CLOSED_NUC})(?:${VI_FINAL})|(?:${VI_OPEN}))$`);
+
+function isVietSyllable(w) {
+  return VI_SYLLABLE.test(w);
+}
+
+/**
+ * Tách văn bản thành các đoạn liên tiếp cùng ngôn ngữ.
+ * @param {string} text
+ * @param {'vi'|'en'} baseLang  ngôn ngữ chính của câu
+ * @param {Record<string,{say:string,lang:string}>} customDict  từ điển riêng của server
+ * @returns {{text:string, lang:'vi'|'en'}[]}
+ */
+export function segmentText(text, baseLang = 'vi', customDict = {}) {
+  const dict = { ...BUILTIN_DICT, ...customDict };
+  const tokens = []; // { text, lang|null }
+
+  // Cụm từ nhiều chữ -> gộp thành 1 từ để tra từ điển
+  text = text.replace(/\bno\s+cap\b/gi, 'nocap').replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
+  for (const raw of text.split(/\s+/).filter(Boolean)) {
+    const m = raw.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}'’.-]*?[\p{L}\p{N}]|[\p{L}\p{N}]?)([^\p{L}\p{N}]*)$/u);
+    if (!m || !m[2]) {
+      tokens.push({ text: raw, lang: null }); // dấu câu / ký hiệu -> theo đoạn trước
+      continue;
+    }
+    const [, pre, core, post] = m;
+    const lower = core.toLowerCase();
+    let short = collapse(lower); // "khummm" -> "khum", "okiii" -> "oki"
+    if (short.length < 2) short = lower; // "aaa" không thành "a"
+    const entry = dict[lower] ?? dict[short];
+    const slang = baseLang === 'vi' ? (VI_SLANG[lower] ?? VI_SLANG[short]) : undefined;
+    let say = core;
+    let lang;
+
+    if (entry) {
+      say = entry.say;
+      lang = entry.lang;
+    } else if (!/\p{L}/u.test(core)) {
+      lang = null; // chỉ có số -> đọc theo giọng đoạn xung quanh
+    } else if (LAUGH.test(lower)) {
+      say = 'ha ha ha'; // kkkk, hahaha, hihihi, hjhjhj...
+      lang = 'vi';
+    } else if (slang) {
+      say = slang;
+      lang = 'vi';
+    } else if (VI_CHARS.test(core)) {
+      lang = 'vi';
+    } else if (baseLang === 'vi') {
+      if (EN_WORDS.has(lower)) lang = 'en';
+      else if (isVietSyllable(lower)) lang = 'vi';
+      else lang = 'en';
+    } else {
+      lang = 'en';
+    }
+    tokens.push({ text: `${pre}${say}${post}`, lang });
+  }
+
+  // Gộp các token liền kề cùng ngôn ngữ
+  const segments = [];
+  for (const t of tokens) {
+    const last = segments[segments.length - 1];
+    if (last && (t.lang === null || t.lang === last.lang)) last.text += ` ${t.text}`;
+    else if (!last && t.lang === null) segments.push({ text: t.text, lang: null });
+    else if (last && last.lang === null) {
+      last.text += ` ${t.text}`;
+      last.lang = t.lang;
+    } else segments.push({ text: t.text, lang: t.lang });
+  }
+  for (const s of segments) s.lang ??= baseLang;
+  // Bỏ đoạn chỉ có dấu câu (không đọc được)
+  return segments.filter((s) => /[\p{L}\p{N}]/u.test(s.text));
+}
+
+// ======================================================================
+//  ENGINE: ElevenLabs (giọng Adam)
+// ======================================================================
+
+const ADAM_VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
+const num = (v, d) => (v === undefined || v === '' || Number.isNaN(Number(v)) ? d : Number(v));
+
+/** Cấu hình riêng cho từng ngôn ngữ -> tông giọng khác nhau khi đổi Việt/Anh */
+function voiceProfile(lang) {
+  const L = lang.toUpperCase();
+  const env = process.env;
+  const defaults =
+    lang === 'vi'
+      ? { stability: 0.55, similarity: 0.8, style: 0, speed: 1.0 }
+      : { stability: 0.4, similarity: 0.75, style: 0.15, speed: 1.0 };
+  return {
+    voiceId: env[`ELEVENLABS_VOICE_${L}`] || env.ELEVENLABS_VOICE_ID || ADAM_VOICE_ID,
+    voice_settings: {
+      stability: num(env[`ELEVENLABS_STABILITY_${L}`], defaults.stability),
+      similarity_boost: num(env[`ELEVENLABS_SIMILARITY_${L}`], defaults.similarity),
+      style: num(env[`ELEVENLABS_STYLE_${L}`], defaults.style),
+      speed: num(env[`ELEVENLABS_SPEED_${L}`], defaults.speed),
+      use_speaker_boost: true,
+    },
+  };
+}
+
+const cache = new Map(); // LRU nhỏ để tiết kiệm credit ElevenLabs
+const CACHE_MAX = 200;
+
+// Gói free ElevenLabs giới hạn số request đồng thời -> xếp hàng
+const MAX_CONCURRENT = Math.max(1, num(process.env.ELEVENLABS_CONCURRENCY, 2));
+let running = 0;
+const waiters = [];
+async function withSlot(fn) {
+  if (running >= MAX_CONCURRENT) await new Promise((r) => waiters.push(r));
+  running++;
+  try {
+    return await fn();
+  } finally {
+    running--;
+    waiters.shift()?.();
+  }
+}
+
+async function elevenLabs(text, lang, attempt = 0) {
+  try {
+    return await withSlot(() => elevenLabsOnce(text, lang));
+  } catch (e) {
+    if (e.status === 429 && attempt < 3) {
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      return elevenLabs(text, lang, attempt + 1);
+    }
+    throw e;
+  }
+}
+
+async function elevenLabsOnce(text, lang) {
+  const { voiceId, voice_settings } = voiceProfile(lang);
+  const model = process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5';
+  const key = `${voiceId}|${model}|${lang}|${JSON.stringify(voice_settings)}|${text}`;
+  if (cache.has(key)) {
+    const buf = cache.get(key);
+    cache.delete(key);
+    cache.set(key, buf);
+    return buf;
+  }
+
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({ text, model_id: model, language_code: lang, voice_settings }),
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(`ElevenLabs ${res.status}: ${body.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  cache.set(key, buf);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  return buf;
+}
+
+// ======================================================================
+//  ENGINE: Google Translate (dự phòng, miễn phí)
+// ======================================================================
+
+async function google(text, lang) {
   const parts = await googleTTS.getAllAudioBase64(text, {
     lang,
     slow: false,
@@ -24,3 +410,27 @@ export async function synthesize(text, lang = 'vi') {
   return Buffer.concat(parts.map((p) => Buffer.from(p.base64, 'base64')));
 }
 
+export const engineName = () => (process.env.ELEVENLABS_API_KEY ? 'ElevenLabs (Adam)' : 'Google');
+
+/**
+ * Chuyển văn bản thành 1 buffer MP3. Tự tách đoạn Việt / Anh,
+ * mỗi đoạn đọc bằng giọng & tông riêng rồi ghép lại.
+ * @param {string} text
+ * @param {'vi'|'en'} lang  ngôn ngữ chính
+ * @param {{dict?: Record<string,{say:string,lang:string}>}} [opts]
+ */
+export async function synthesize(text, lang = 'vi', opts = {}) {
+  const segments = segmentText(text, lang, opts.dict);
+  if (!segments.length) throw new Error('Không có gì để đọc');
+
+  if (process.env.ELEVENLABS_API_KEY) {
+    try {
+      const bufs = await Promise.all(segments.map((s) => elevenLabs(s.text, s.lang)));
+      return Buffer.concat(bufs);
+    } catch (e) {
+      console.warn('[tts] ElevenLabs lỗi, chuyển sang Google:', e.message);
+    }
+  }
+  const bufs = await Promise.all(segments.map((s) => google(s.text, s.lang)));
+  return Buffer.concat(bufs);
+}

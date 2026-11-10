@@ -10,6 +10,7 @@ import {
 } from '@discordjs/voice';
 import { Readable } from 'node:stream';
 import { synthesize } from './tts.js';
+import { getGuild } from './store.js';
 
 const sessions = new Map();
 const MAX_QUEUE = 25;
@@ -71,7 +72,7 @@ class TTSSession {
     if (!item) return;
     this.busy = true;
     try {
-      const mp3 = await synthesize(item.text, item.lang);
+      const mp3 = await synthesize(item.text, item.lang, { dict: getGuild(this.guildId).dict });
       const resource = createAudioResource(Readable.from([mp3]), { inputType: StreamType.Arbitrary });
       this.player.play(resource);
     } catch (err) {

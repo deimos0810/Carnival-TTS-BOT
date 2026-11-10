@@ -87,6 +87,32 @@ const tts = new SlashCommandBuilder()
       .setName('autojoin')
       .setDescription('[Admin] Tự vào voice khi người có role nhắn tin')
       .addBooleanOption((o) => o.setName('enabled').setDescription('Bật?').setRequired(true)),
+  )
+  .addSubcommandGroup((g) =>
+    g
+      .setName('word')
+      .setDescription('Từ điển phát âm (vd: "ye" đọc là "de")')
+      .addSubcommand((s) =>
+        s
+          .setName('add')
+          .setDescription('[Admin] Thêm/sửa cách đọc một từ')
+          .addStringOption((o) => o.setName('word').setDescription('Từ gốc (vd: ye)').setRequired(true).setMaxLength(40))
+          .addStringOption((o) => o.setName('say').setDescription('Đọc thành (vd: de)').setRequired(true).setMaxLength(100))
+          .addStringOption((o) =>
+            o
+              .setName('lang')
+              .setDescription('Đọc bằng giọng nào')
+              .setRequired(true)
+              .addChoices({ name: 'Tiếng Việt', value: 'vi' }, { name: 'English', value: 'en' }),
+          ),
+      )
+      .addSubcommand((s) =>
+        s
+          .setName('remove')
+          .setDescription('[Admin] Xoá cách đọc của một từ')
+          .addStringOption((o) => o.setName('word').setDescription('Từ').setRequired(true)),
+      )
+      .addSubcommand((s) => s.setName('list').setDescription('Xem từ điển phát âm của server')),
   );
 
 const join = new SlashCommandBuilder().setName('join').setDescription('Gọi bot vào kênh voice bạn đang ở');
