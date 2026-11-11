@@ -196,9 +196,10 @@ const VI_SLANG = {
   thik: 'thích', thic: 'thích', iu: 'yêu', yeu: 'yêu', hc: 'học',
   // khác
   nc: 'nước', đt: 'điện thoại', hs: 'học sinh', sv: 'sinh viên', gv: 'giáo viên',
+  svv: 'server vip', svvv: 'server vip', svvip: 'server vip',
   kq: 'kết quả', vd: 'ví dụ', ib: 'inbox',
   // cảm thán & từ bậy GenZ (dự án vui)
-  vl: 'vãi lồn', vcl: 'vãi cả lồn', vkl: 'vãi cả lồn', vcc: 'vãi cả cặc', vch: 'vãi chưởng',
+  vl: 'vãi lồn', vcl: 'vãi cả lồn', vkl: 'vãi cả lồn', vcc: 'vãi cả cức', vccc: 'vãi cả cức', vcccc: 'vãi cả cức', vch: 'vãi chưởng',
   vc: 'vãi cứt', vđ: 'vãi đái', vđl: 'vãi đái lồn',
   đm: 'địt mẹ', dm: 'địt mẹ', đmm: 'địt mẹ mày', dmm: 'địt mẹ mày',
   đcm: 'địt con mẹ', dcm: 'địt con mẹ', đcmn: 'địt con mẹ nó', dcmn: 'địt con mẹ nó',
@@ -256,6 +257,7 @@ export const EN_PHONETIC_VI = {
   team: 'tim',
   game: 'gêm',
   server: 'xơ vơ',
+  vip: 'víp',
   admin: 'át min',
   mod: 'mót',
   bot: 'bót',
@@ -369,6 +371,7 @@ const VI_SLANG_STRONG = new Set([
   'mng', 'ae', 'mik', 'mk', 'thg', 'ny', 'nyc', 'vk', 'ck', 'vs', 'cx', 'cg', 'nx', 'nma', 'nhma', 'trc', 'thui',
   'bik', 'thik', 'iu', 'vl', 'vcl', 'vkl', 'vch', 'sml', 'hnay', 'hqua', 'bjo', 'dag', 'pk',
   'dmm', 'đmm', 'clmm', 'dclmm', 'đclmm', 'clbgm', 'dcdmm', 'đcdmm', 'dcmm', 'đcmm', 'dcm', 'đcm', 'dkm', 'đkm', 'duma', 'đuma', 'cldmm', 'clm', 'dclm', 'đclm',
+  'svv', 'svvip',
 ]);
 
 /** Từ tiếng Anh phổ biến trông giống âm tiết Việt — dùng khi đoán ngôn ngữ câu không dấu */
@@ -418,7 +421,11 @@ export function normalizeTextForSpeech(text, baseLang = 'vi', customDict = {}, p
     .replace(/\bin\s+my\s+opinion\b/gi, 'imo')
     .replace(/\bno\s+cap\b/gi, 'nocap')
     .replace(/\bthg\s+n([aàáạảãâầấậẩẫăằắặẳẵeèéẹẻẽêềếệểễoòóọỏõôồốộổỗơờớợởỡuùúụủũưừứựửữiìíịỉĩyỳýỵỷỹ])\b/gi, 'thằng n$1')
-    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
+    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ')
+    .replace(/\b(?:công|cong)[-_\s]+ty\b/gi, 'công ti')
+    .replace(/\bcty\b/gi, 'công ti')
+    .replace(/\b(\d+)\s*ty\b/gi, '$1 tỷ')
+    .replace(/\b(bé|chị|em|con|bác|chú|cô)\s+ty\b/gi, '$1 ti');
 
   const words = t.split(/\s+/).filter(Boolean);
   const result = [];
@@ -476,7 +483,11 @@ export function segmentText(text, baseLang = 'vi', customDict = {}) {
     .replace(/\bnot\s+gonna\s+lie\b/gi, 'ngl')
     .replace(/\bin\s+my\s+opinion\b/gi, 'imo')
     .replace(/\bno\s+cap\b/gi, 'nocap')
-    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ');
+    .replace(/[:;=]+[)(dDpP]+|<3/g, ' ')
+    .replace(/\b(?:công|cong)[-_\s]+ty\b/gi, 'công ti')
+    .replace(/\bcty\b/gi, 'công ti')
+    .replace(/\b(\d+)\s*ty\b/gi, '$1 tỷ')
+    .replace(/\b(bé|chị|em|con|bác|chú|cô)\s+ty\b/gi, '$1 ti');
   for (const raw of text.split(/\s+/).filter(Boolean)) {
     const m = raw.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}'’.-]*?[\p{L}\p{N}]|[\p{L}\p{N}]?)([^\p{L}\p{N}]*)$/u);
     if (!m || !m[2]) {
@@ -556,21 +567,21 @@ function voiceProfile(lang, customVoiceId) {
   // - similarity_boost = 0.65: Giúp mô hình linh hoạt thể hiện đúng thanh điệu tiếng Việt (hỏi, ngã, nặng, sắc)
   //   thay vì bị ép cứng theo khẩu hình tiếng Anh của voice gốc (vốn gây ra giọng lớ).
   // - style = 0.0: Tránh cường điệu cảm xúc làm biến dạng dấu tiếng Việt.
-  // - speed = 1.0: Tốc độ chuẩn.
+  // - speed = 0.88: Giảm tốc độ đọc một chút (~12%) giúp nhả chữ tròn vành, rõ từng thanh điệu tiếng Việt.
   const defaults = {
     stability: isVi ? 0.75 : 0.65,
     similarity: isVi ? 0.65 : 0.80,
     style: 0.0,
-    speed: 1.0,
+    speed: isVi ? 0.88 : 1.0,
   };
   const voiceId = customVoiceId || env[`ELEVENLABS_VOICE_${L}`] || env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID;
   return {
     voiceId,
     voice_settings: {
-      stability: num(env[`ELEVENLABS_STABILITY_${L}`], defaults.stability),
-      similarity_boost: num(env[`ELEVENLABS_SIMILARITY_${L}`], defaults.similarity),
-      style: num(env[`ELEVENLABS_STYLE_${L}`], defaults.style),
-      speed: num(env[`ELEVENLABS_SPEED_${L}`], defaults.speed),
+      stability: num(env[`ELEVENLABS_STABILITY_${L}`] || env.ELEVENLABS_STABILITY, defaults.stability),
+      similarity_boost: num(env[`ELEVENLABS_SIMILARITY_${L}`] || env.ELEVENLABS_SIMILARITY, defaults.similarity),
+      style: num(env[`ELEVENLABS_STYLE_${L}`] || env.ELEVENLABS_STYLE, defaults.style),
+      speed: num(env[`ELEVENLABS_SPEED_${L}`] || env.ELEVENLABS_SPEED, defaults.speed),
       use_speaker_boost: true,
     },
   };
