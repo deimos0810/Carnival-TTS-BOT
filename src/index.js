@@ -265,6 +265,44 @@ async function handleTTS(i, cfg, member) {
       flags: ephemeral,
     });
   }
+  if (sub === 'customvoice') {
+    const rawId = i.options.getString('voice_id');
+    const voiceId = rawId?.trim();
+    if (!voiceId) {
+      getUser(i.user.id).voiceId = null;
+      await flushNow();
+      return i.reply({
+        content: '🔄 Đã khôi phục nhân vật giọng của bạn về mặc định server.',
+        flags: ephemeral,
+      });
+    }
+    getUser(i.user.id).voiceId = voiceId;
+    await flushNow();
+    return i.reply({
+      content: `✅ Đã lưu Voice ID riêng cho bạn: \`${voiceId}\`\n💡 *Nếu bạn đã train/clone giọng trên ElevenLabs, bot sẽ dùng đúng chất giọng này khi bạn chat!*`,
+      flags: ephemeral,
+    });
+  }
+  if (sub === 'servercustomvoice') {
+    if (!isAdmin(member) && !isOwner(i.user.id))
+      return i.reply({ content: '❌ Cần quyền **Manage Server**.', flags: ephemeral });
+    const rawId = i.options.getString('voice_id');
+    const voiceId = rawId?.trim();
+    if (!voiceId) {
+      cfg.voiceId = null;
+      await flushNow();
+      return i.reply({
+        content: '🔄 Đã khôi phục nhân vật giọng mặc định của server về mặc định (Adam).',
+        flags: ephemeral,
+      });
+    }
+    cfg.voiceId = voiceId;
+    await flushNow();
+    return i.reply({
+      content: `✅ Đã đặt Voice ID riêng mặc định cho cả server: \`${voiceId}\`\n💡 *Tất cả thành viên trong server chưa cài giọng riêng sẽ dùng giọng này.*`,
+      flags: ephemeral,
+    });
+  }
   if (sub === 'engine') {
     if (!isAdmin(member) && !isOwner(i.user.id))
       return i.reply({ content: '❌ Cần quyền **Manage Server**.', flags: ephemeral });
@@ -290,7 +328,8 @@ async function handleTTS(i, cfg, member) {
   }
   if (sub === 'settings') {
     const currentVoiceId = cfg.voiceId || DEFAULT_VOICE_ID;
-    const voiceLabel = voiceChoices.find((c) => c.value === currentVoiceId)?.name || 'Brian';
+    const matchedVoice = voiceChoices.find((c) => c.value === currentVoiceId);
+    const voiceLabel = matchedVoice ? matchedVoice.name : `Tùy chỉnh (\`${currentVoiceId}\`)`;
     const e = new EmbedBuilder()
       .setColor(0x5865f2)
       .setTitle('⚙️ Cài đặt TTS')

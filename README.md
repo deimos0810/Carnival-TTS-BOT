@@ -27,7 +27,12 @@ Bot Discord đa năng kết hợp:
 | `/leave` | Mọi người | Cho bot rời voice |
 | `/skip` | Mọi người | Bỏ qua câu bot đang đọc dở |
 | `/say <text> [lang]` | Có role TTS | Bot đọc một câu tùy ý trong voice |
-| `/tts voice <lang>` | Mọi người | Tự chọn giọng đọc cá nhân: Tự động / English / Tiếng Việt |
+| `/tts character <voice>` | Mọi người | Chọn nhân vật giọng đọc cho bản thân (Adam, Brian, Daniel, Liam, George) |
+| `/tts customvoice [voice_id]` | Mọi người | Cài Voice ID ElevenLabs riêng cho bản thân (giọng clone/train riêng) |
+| `/tts servervoice <voice>` | Admin | Đổi nhân vật giọng đọc mặc định của server |
+| `/tts servercustomvoice [voice_id]` | Admin | Đổi Voice ID ElevenLabs mặc định cho cả server (giọng clone/train riêng) |
+| `/tts engine <engine>` | Admin | Chọn bộ đọc: **ElevenLabs** (Adam chuẩn Việt) hoặc **Google** |
+| `/tts voice <lang>` | Mọi người | Tự chọn ngôn ngữ đọc: Tự động / English / Tiếng Việt |
 | `/tts settings` | Mọi người | Xem cấu hình TTS hiện tại của server |
 | `/tts addrole <role>` | Admin | **Thêm role được bot đọc tin nhắn** |
 | `/tts removerole <role>` | Admin | Xoá role khỏi danh sách được đọc |
@@ -41,7 +46,12 @@ Bot Discord đa năng kết hợp:
 | `/tts word remove <word>` | Admin | Xoá cách đọc đã thêm |
 | `/tts word list` | Mọi người | Xem từ điển phát âm |
 
-> 🎙️ **Giọng Adam (ElevenLabs):** đặt biến môi trường `ELEVENLABS_API_KEY` để dùng giọng Adam. Bot tự tách từng từ tiếng Việt / tiếng Anh trong câu và đọc mỗi đoạn với giọng + tông riêng (`language_code` vi/en). Không có key thì bot dùng giọng Google (vẫn tách Việt/Anh).
+> 🎙️ **Giọng Adam (ElevenLabs Tối Ưu Tiếng Việt):**
+> - Sử dụng model **`eleven_turbo_v2_5`** cùng cờ ép ngôn ngữ **`language_code: 'vi'`** giúp phát âm tiếng Việt chuẩn xác, tròn vành rõ chữ.
+> - Tinh chỉnh thông số vàng: `stability: 0.75` (giữ tông vững, không bị tụt hơi hay méo giọng), `similarity_boost: 0.65` (thể hiện chuẩn thanh điệu hỏi, ngã, nặng, sắc không bị ép theo khẩu hình tiếng Anh).
+> - Thuật toán **`splitLongText`** tự động phân tích và ngắt nghỉ tự nhiên theo mệnh đề khi gặp câu dài, sau đó nối mượt mà, giúp bot đọc câu dài không bao giờ bị hụt hơi hay lớ tiếng.
+> - Hỗ trợ các từ lóng / chửi bậy viết tắt phổ biến: `clmm`, `dclmm`, `clbgm`, `dcdmm`, `dmm`... và tự nhận diện tiếng Việt không dấu.
+> - Hỗ trợ giọng tự train / clone qua lệnh `/tts customvoice` và `/tts servercustomvoice`.
 
 ---
 

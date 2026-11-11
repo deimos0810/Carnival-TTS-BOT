@@ -112,7 +112,7 @@ export function getGuild(id) {
   g.roleIds ??= [];
   g.channelIds ??= [];
   g.defaultLang ??= 'auto';
-  g.engine ??= 'google'; // 'google' (Thuần Việt 100%) hoặc 'elevenlabs' (Giọng Tây)
+  g.engine ??= process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : 'google';
   g.ttsMode ??= 'smooth'; // 'smooth' (Một giọng hài hước, mượt mà) hoặc 'split' (Đổi giọng Mỹ)
   g.sayName ??= false;
   g.autoJoin ??= true;

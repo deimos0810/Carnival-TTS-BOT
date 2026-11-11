@@ -7,9 +7,9 @@ const langChoices = [
 ];
 
 export const voiceChoices = [
-  { name: '🌟 Brian (Trầm ấm, rõ chữ nhất - Khuyên dùng)', value: 'nPczCjzI2devNBz1zQrb' },
+  { name: '🧔 Adam (Nam trầm - Chuẩn Việt nhất - Khuyên dùng)', value: 'pNInz6obpgDQGcFmaJgB' },
+  { name: '🌟 Brian (Trầm ấm, rõ chữ)', value: 'nPczCjzI2devNBz1zQrb' },
   { name: '🎙️ Daniel (Phát thanh viên, tròn vành rõ chữ)', value: 'onwK4e9ZLuTAKqWW03F9' },
-  { name: '🧔 Adam (Nam trầm)', value: 'pNInz6obpgDQGcFmaJgB' },
   { name: '⚡ Liam (Nam trẻ, tự nhiên)', value: 'TX3LPaxmHKxFdv7VOQHJ' },
   { name: '🎩 George (Nam ấm áp)', value: 'JBFqnCBsd6RMkjVDRZzb' },
 ];
@@ -59,16 +59,32 @@ const tts = new SlashCommandBuilder()
   )
   .addSubcommand((s) =>
     s
+      .setName('customvoice')
+      .setDescription('Cài đặt Voice ID riêng (giọng tự train/clone từ ElevenLabs)')
+      .addStringOption((o) =>
+        o.setName('voice_id').setDescription('Voice ID ElevenLabs (để trống để xóa và quay về mặc định)').setRequired(false),
+      ),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('servercustomvoice')
+      .setDescription('[Admin] Cài đặt Voice ID riêng mặc định cho cả server (giọng tự train/clone)')
+      .addStringOption((o) =>
+        o.setName('voice_id').setDescription('Voice ID ElevenLabs (để trống để xóa và quay về mặc định)').setRequired(false),
+      ),
+  )
+  .addSubcommand((s) =>
+    s
       .setName('engine')
-      .setDescription('[Admin] Chọn bộ đọc: Google (Thuần Việt 100%) hoặc ElevenLabs (Giọng Tây)')
+      .setDescription('[Admin] Chọn bộ đọc: ElevenLabs (Adam nam trầm chuẩn Việt) hoặc Google')
       .addStringOption((o) =>
         o
           .setName('engine')
           .setDescription('Bộ đọc âm thanh')
           .setRequired(true)
           .addChoices(
-            { name: '🇻🇳 Google (Thuần Việt 100% + Đọc tiếng Anh chuẩn - Khuyên dùng)', value: 'google' },
-            { name: '🎙️ ElevenLabs (Giọng nam trầm phương Tây Adam/Brian)', value: 'elevenlabs' },
+            { name: '🎙️ ElevenLabs (Adam / Brian - Giọng nam trầm, chuẩn tiếng Việt - Khuyên dùng)', value: 'elevenlabs' },
+            { name: '🇻🇳 Google (Thuần Việt 100% Chị Google)', value: 'google' },
           ),
       ),
   )

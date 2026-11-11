@@ -9,7 +9,7 @@ import {
   StreamType,
 } from '@discordjs/voice';
 import { Readable } from 'node:stream';
-import { synthesize } from './tts.js';
+import { synthesize, DEFAULT_VOICE_ID } from './tts.js';
 import { getGuild } from './store.js';
 
 const sessions = new Map();
@@ -75,9 +75,9 @@ class TTSSession {
       const guildCfg = getGuild(this.guildId);
       const mp3 = await synthesize(item.text, item.lang, {
         dict: guildCfg.dict,
-        engine: item.engine || guildCfg.engine || 'google',
+        engine: item.engine || guildCfg.engine || (process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : 'google'),
         mode: item.mode || guildCfg.ttsMode || 'smooth',
-        voiceId: item.voiceId || guildCfg.voiceId,
+        voiceId: item.voiceId || guildCfg.voiceId || DEFAULT_VOICE_ID,
       });
       const resource = createAudioResource(Readable.from([mp3]), { inputType: StreamType.Arbitrary });
       this.player.play(resource);

@@ -203,7 +203,14 @@ const VI_SLANG = {
   đm: 'địt mẹ', dm: 'địt mẹ', đmm: 'địt mẹ mày', dmm: 'địt mẹ mày',
   đcm: 'địt con mẹ', dcm: 'địt con mẹ', đcmn: 'địt con mẹ nó', dcmn: 'địt con mẹ nó',
   đkm: 'địt con mẹ', dkm: 'địt con mẹ', đuma: 'đụ má', duma: 'đụ má',
-  cl: 'cái lồn', clgt: 'cái lồn gì thế', cclgt: 'cái con lồn gì thế',
+  dcmm: 'địt con mẹ mày', đcmm: 'địt con mẹ mày',
+  dcdmm: 'địt con đĩ mẹ mày', đcdmm: 'địt con đĩ mẹ mày',
+  dcdm: 'địt con đĩ mẹ', đcdm: 'địt con đĩ mẹ',
+  cl: 'cái lồn', clm: 'cái lồn mẹ mày', clmm: 'cái lồn mẹ mày',
+  dclm: 'địt cái lồn mẹ mày', đclm: 'địt cái lồn mẹ mày',
+  dclmm: 'địt cái lồn mẹ mày', đclmm: 'địt cái lồn mẹ mày',
+  clbgm: 'cái lồn bà già mày', cldmm: 'cái lồn đĩ mẹ mày',
+  clgt: 'cái lồn gì thế', cclgt: 'cái con lồn gì thế',
   ml: 'mặt lồn', sml: 'sấp mặt lồn', cc: 'con cặc',
   đb: 'đầu buồi', db: 'đầu buồi', tđn: 'thế đéo nào', tdn: 'thế đéo nào',
   cmm: 'con mẹ mày', cmn: 'con mẹ nó', cmnr: 'con mẹ nó rồi', cmnl: 'con mẹ nó luôn',
@@ -361,6 +368,7 @@ const VI_SLANG_STRONG = new Set([
   'ko', 'kh', 'khg', 'khum', 'hok', 'hong', 'kb', 'kbt', 'kp', 'kcj', 'dc', 'dk', 'lmj', 'lsao', 'ntn', 'mn',
   'mng', 'ae', 'mik', 'mk', 'thg', 'ny', 'nyc', 'vk', 'ck', 'vs', 'cx', 'cg', 'nx', 'nma', 'nhma', 'trc', 'thui',
   'bik', 'thik', 'iu', 'vl', 'vcl', 'vkl', 'vch', 'sml', 'hnay', 'hqua', 'bjo', 'dag', 'pk',
+  'dmm', 'đmm', 'clmm', 'dclmm', 'đclmm', 'clbgm', 'dcdmm', 'đcdmm', 'dcmm', 'đcmm', 'dcm', 'đcm', 'dkm', 'đkm', 'duma', 'đuma', 'cldmm', 'clm', 'dclm', 'đclm',
 ]);
 
 /** Từ tiếng Anh phổ biến trông giống âm tiết Việt — dùng khi đoán ngôn ngữ câu không dấu */
@@ -528,24 +536,33 @@ export function segmentText(text, baseLang = 'vi', customDict = {}) {
 // ======================================================================
 
 export const VOICES = {
-  brian: { name: 'Brian (Trầm ấm, rõ chữ nhất - Khuyên dùng)', id: 'nPczCjzI2devNBz1zQrb' },
-  daniel: { name: 'Daniel (Phát thanh viên, tròn vành rõ chữ)', id: 'onwK4e9ZLuTAKqWW03F9' },
-  adam: { name: 'Adam (Nam trầm)', id: 'pNInz6obpgDQGcFmaJgB' },
-  liam: { name: 'Liam (Nam trẻ, tự nhiên)', id: 'TX3LPaxmHKxFdv7VOQHJ' },
-  george: { name: 'George (Nam ấm áp)', id: 'JBFqnCBsd6RMkjVDRZzb' },
+  adam: { name: '🧔 Adam (Nam trầm - Chuẩn Việt nhất)', id: 'pNInz6obpgDQGcFmaJgB' },
+  brian: { name: '🌟 Brian (Trầm ấm, rõ chữ)', id: 'nPczCjzI2devNBz1zQrb' },
+  daniel: { name: '🎙️ Daniel (Phát thanh viên, tròn vành)', id: 'onwK4e9ZLuTAKqWW03F9' },
+  liam: { name: '⚡ Liam (Nam trẻ, tự nhiên)', id: 'TX3LPaxmHKxFdv7VOQHJ' },
+  george: { name: '🎩 George (Nam ấm áp)', id: 'JBFqnCBsd6RMkjVDRZzb' },
 };
 
-export const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || VOICES.brian.id;
+export const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || VOICES.adam.id;
 const num = (v, d) => (v === undefined || v === '' || Number.isNaN(Number(v)) ? d : Number(v));
 
-/** Cấu hình giọng đọc và tối ưu thông số để phát âm rõ chữ, đều nhịp */
+/** Cấu hình giọng đọc và tối ưu thông số để phát âm chuẩn xác, không bị lơ lớ ở câu dài */
 function voiceProfile(lang, customVoiceId) {
   const L = lang.toUpperCase();
   const env = process.env;
-  // stability = 0.65 giúp giữ nhịp đều, không bị lúc nhanh lúc chậm
-  // similarity = 0.85 giúp phát âm rõ âm điệu, tròn vành rõ chữ tiếng Việt
-  // style = 0.0 loại bỏ cảm xúc kịch tính gây nói vấp
-  const defaults = { stability: 0.65, similarity: 0.85, style: 0.0, speed: 1.0 };
+  const isVi = lang === 'vi';
+  // Tối ưu đặc biệt cho tiếng Việt để giọng Adam (hoặc giọng clone):
+  // - stability = 0.75: Giữ cao độ và nhịp thở ổn định, chống hiện tượng tụt tông/lơ lớ khi đọc câu dài.
+  // - similarity_boost = 0.65: Giúp mô hình linh hoạt thể hiện đúng thanh điệu tiếng Việt (hỏi, ngã, nặng, sắc)
+  //   thay vì bị ép cứng theo khẩu hình tiếng Anh của voice gốc (vốn gây ra giọng lớ).
+  // - style = 0.0: Tránh cường điệu cảm xúc làm biến dạng dấu tiếng Việt.
+  // - speed = 1.0: Tốc độ chuẩn.
+  const defaults = {
+    stability: isVi ? 0.75 : 0.65,
+    similarity: isVi ? 0.65 : 0.80,
+    style: 0.0,
+    speed: 1.0,
+  };
   const voiceId = customVoiceId || env[`ELEVENLABS_VOICE_${L}`] || env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID;
   return {
     voiceId,
@@ -577,13 +594,83 @@ async function withSlot(fn) {
   }
 }
 
-async function elevenLabs(text, lang, customVoiceId, attempt = 0) {
+/**
+ * Tách câu dài thành các cụm mệnh đề tự nhiên (tối đa ~160 ký tự)
+ * để AI lấy hơi đều, không bị tụt tông hoặc lơ lớ ở đoạn cuối câu dài.
+ */
+export function splitLongText(text, maxChunkLen = 160) {
+  if (text.length <= maxChunkLen) return [text.trim()];
+  const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+  const chunks = [];
+  let cur = '';
+
+  for (const s of sentences) {
+    const trimmed = s.trim();
+    if (!trimmed) continue;
+    if (trimmed.length > maxChunkLen) {
+      if (cur) {
+        chunks.push(cur.trim());
+        cur = '';
+      }
+      const clauses = trimmed.match(/[^,;:—]+[,;:—]*/g) || [trimmed];
+      let clauseBuf = '';
+      for (const cl of clauses) {
+        if (cl.length > maxChunkLen) {
+          const words = cl.split(/\s+/);
+          for (const w of words) {
+            if ((clauseBuf + ' ' + w).trim().length <= maxChunkLen) {
+              clauseBuf = (clauseBuf + ' ' + w).trim();
+            } else {
+              if (clauseBuf) chunks.push(clauseBuf.trim());
+              clauseBuf = w;
+            }
+          }
+        } else if ((clauseBuf + ' ' + cl).trim().length <= maxChunkLen) {
+          clauseBuf = (clauseBuf + ' ' + cl).trim();
+        } else {
+          if (clauseBuf) chunks.push(clauseBuf.trim());
+          clauseBuf = cl.trim();
+        }
+      }
+      if (clauseBuf) chunks.push(clauseBuf.trim());
+    } else if ((cur + ' ' + trimmed).trim().length <= maxChunkLen) {
+      cur = (cur + ' ' + trimmed).trim();
+    } else {
+      if (cur) chunks.push(cur.trim());
+      cur = trimmed;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks.filter(Boolean);
+}
+
+async function elevenLabs(text, lang, customVoiceId) {
+  const chunks = splitLongText(text, 180);
+  if (chunks.length <= 1) {
+    let t = chunks[0] || text;
+    if (!/[.!?]$/.test(t)) t += '.';
+    return await elevenLabsWithRetry(t, lang, customVoiceId);
+  }
+
+  const bufs = [];
+  for (let idx = 0; idx < chunks.length; idx++) {
+    let chunk = chunks[idx];
+    if (!/[.!?]$/.test(chunk)) {
+      chunk += (idx < chunks.length - 1 ? ',' : '.');
+    }
+    const buf = await elevenLabsWithRetry(chunk, lang, customVoiceId);
+    bufs.push(buf);
+  }
+  return Buffer.concat(bufs);
+}
+
+async function elevenLabsWithRetry(text, lang, customVoiceId, attempt = 0) {
   try {
     return await withSlot(() => elevenLabsOnce(text, lang, customVoiceId));
   } catch (e) {
     if (e.status === 429 && attempt < 3) {
-      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-      return elevenLabs(text, lang, customVoiceId, attempt + 1);
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      return elevenLabsWithRetry(text, lang, customVoiceId, attempt + 1);
     }
     throw e;
   }
@@ -591,14 +678,22 @@ async function elevenLabs(text, lang, customVoiceId, attempt = 0) {
 
 async function elevenLabsOnce(text, lang, customVoiceId) {
   const { voiceId, voice_settings } = voiceProfile(lang, customVoiceId);
-  // Dùng eleven_multilingual_v2 để phát âm tiếng Việt chuẩn xác nhất
-  const model = process.env.ELEVENLABS_MODEL || 'eleven_multilingual_v2';
+  // Mô hình: eleven_turbo_v2_5 hỗ trợ ép ngôn ngữ tiếng Việt (language_code: 'vi')
+  // giúp phát âm chuẩn xác, không bị lơ lớ ở câu dài như eleven_multilingual_v2
+  const model = process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5';
   const key = `${voiceId}|${model}|${lang}|${JSON.stringify(voice_settings)}|${text}`;
   if (cache.has(key)) {
     const buf = cache.get(key);
     cache.delete(key);
     cache.set(key, buf);
     return buf;
+  }
+
+  const payload = { text, model_id: model, voice_settings };
+  if (lang === 'vi' && (model.includes('turbo') || model.includes('flash'))) {
+    payload.language_code = 'vi';
+  } else if (lang === 'en' && (model.includes('turbo') || model.includes('flash'))) {
+    payload.language_code = 'en';
   }
 
   const res = await fetch(
@@ -610,7 +705,7 @@ async function elevenLabsOnce(text, lang, customVoiceId) {
         'Content-Type': 'application/json',
         Accept: 'audio/mpeg',
       },
-      body: JSON.stringify({ text, model_id: model, voice_settings }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000),
     },
   );
@@ -641,9 +736,9 @@ async function google(text, lang) {
   return Buffer.concat(parts.map((p) => Buffer.from(p.base64, 'base64')));
 }
 
-export const engineName = (engine = 'google') =>
+export const engineName = (engine = 'elevenlabs') =>
   engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY
-    ? 'ElevenLabs (Brian / Adam)'
+    ? 'ElevenLabs (Adam - Nam trầm)'
     : 'Google (Chị Google Thuần Việt)';
 
 /**
@@ -658,7 +753,7 @@ export const engineName = (engine = 'google') =>
  */
 export async function synthesize(text, lang = 'vi', opts = {}) {
   const dict = opts.dict || {};
-  const engine = opts.engine || 'google';
+  const engine = opts.engine || (process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : 'google');
   const mode = opts.mode || 'smooth'; // 'smooth' (mượt mà hài hước - một giọng) hoặc 'split' (đổi giọng Mỹ)
 
   if (engine === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
