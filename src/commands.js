@@ -199,15 +199,15 @@ function addTradeOptions(builder) {
     .addStringOption((o) =>
       o
         .setName('give')
-        .setDescription('Món bạn đưa (vd: 2 dark mage, hoặc dark mage, dio)')
-        .setRequired(true)
+        .setDescription('Món bạn đưa (vd: 2 aizen, 4 dracula) - Để trống để mở bảng tương tác')
+        .setRequired(false)
         .setAutocomplete(true),
     )
     .addStringOption((o) =>
       o
         .setName('get')
-        .setDescription('Món bạn nhận (vd: 2 battle pass, hoặc battle pass, vip)')
-        .setRequired(true)
+        .setDescription('Món bạn nhận (vd: battle pass, vip) - Để trống để mở bảng tương tác')
+        .setRequired(false)
         .setAutocomplete(true),
     )
     .addBooleanOption((o) => o.setName('speak').setDescription('Bot đọc kết quả trong voice?'))

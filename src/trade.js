@@ -1,5 +1,17 @@
-import { EmbedBuilder } from 'discord.js';
+import {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+} from 'discord.js';
 import { findValue, searchValues, CATEGORIES } from './values.js';
+
+export const tradeSessions = new Map();
 
 function parseNumber(str, def = 0) {
   if (!str || str === 'N/A' || str === 'Untradable') return def;
@@ -7,7 +19,7 @@ function parseNumber(str, def = 0) {
   return isNaN(n) ? def : n;
 }
 
-function cleanItemName(raw) {
+export function cleanItemName(raw) {
   return raw
     .replace(/\s*\([^)]*Val:[^)]*\)/gi, '')
     .replace(/\s*\([^)]*Tier[^)]*\)/gi, '')
@@ -17,10 +29,25 @@ function cleanItemName(raw) {
     .trim();
 }
 
-/** Tách chuỗi danh sách item, hỗ trợ số lượng (vd: "2 darkmage", "2x Grand Return Bundle", "Battle Pass, VIP") */
+export function shortenItemName(name) {
+  if (!name) return '';
+  if (name.includes(' / ')) {
+    const parts = name.split(' / ');
+    return parts[1] || name;
+  }
+  return name;
+}
+
+/** Tách chuỗi danh sách item, hỗ trợ số lượng thông minh (vd: "2 aizen", "aizen 2", "2x dio", "summer bundle 1") */
 export function parseTradeItems(text) {
   if (!text) return { items: [], notFound: [] };
-  const parts = text
+  // Xóa sạch các phụ chú (Val: ..., Tier: ...) trước khi split để dấu phẩy trong số (vd: 17,000) không làm vỡ câu
+  const sanitized = text
+    .replace(/\([^)]*Val:[^)]*\)/gi, '')
+    .replace(/\([^)]*Tier[^)]*\)/gi, '')
+    .replace(/\([^)]*Demand:[^)]*\)/gi, '');
+
+  const parts = sanitized
     .split(/[,+\n&]|(?:\s+và\s+)|\sand\s/i)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -32,23 +59,39 @@ export function parseTradeItems(text) {
     let qty = 1;
     let cleanName = part;
 
-    // Pattern 1: "2x item" or "2* item"
+    // 1. Kiểm tra trực tiếp cả chuỗi part có phải tên 1 item không (vd: 'Summer Bundle 1', 'SSS DMG (Stat)')
+    const directItem = findValue(cleanItemName(cleanName));
+    if (directItem) {
+      const existing = items.find((e) => e.item.key === directItem.key);
+      if (existing) existing.qty += 1;
+      else items.push({ item: directItem, qty: 1 });
+      continue;
+    }
+
+    // Pattern 1: "2x item" hoặc "2* item"
     const m1 = cleanName.match(/^(\d+)\s*[*xX]\s*(.+)$/);
     if (m1) {
       qty = Math.max(1, parseInt(m1[1], 10));
       cleanName = m1[2];
     } else {
-      // Pattern 2: "2 item" (số đứng trước chữ, vd: "2 darkmage" hoặc "2 battle pass")
+      // Pattern 2: "2 item" (số đứng trước chữ, vd: "2 dark mage" hoặc "6 aizen")
       const m2 = cleanName.match(/^(\d+)\s+([a-zA-Z\u00C0-\u1EF9].+)$/);
       if (m2) {
         qty = Math.max(1, parseInt(m2[1], 10));
         cleanName = m2[2];
       } else {
-        // Pattern 3: "item x2"
+        // Pattern 3: "item x2" hoặc "item * 2"
         const m3 = cleanName.match(/^(.+?)\s*[*xX]\s*(\d+)$/);
         if (m3) {
           qty = Math.max(1, parseInt(m3[2], 10));
           cleanName = m3[1];
+        } else {
+          // Pattern 4: "item 2" (số sau chữ, vd: "aizen 6")
+          const m4 = cleanName.match(/^([a-zA-Z\u00C0-\u1EF9].+?)\s+(\d+)$/);
+          if (m4 && isNaN(m4[1])) {
+            qty = Math.max(1, parseInt(m4[2], 10));
+            cleanName = m4[1];
+          }
         }
       }
     }
@@ -56,7 +99,6 @@ export function parseTradeItems(text) {
     const stripped = cleanItemName(cleanName);
     const item = findValue(stripped) || findValue(cleanName);
     if (item) {
-      // Gộp nếu cùng item
       const existing = items.find((e) => e.item.key === item.key);
       if (existing) existing.qty += qty;
       else items.push({ item, qty });
@@ -70,6 +112,22 @@ export function parseTradeItems(text) {
 
 /** Đánh giá kèo trade W/F/L dựa trên Value, Demand, Trend, Unob/Shiny */
 export function evaluateTrade(giveEntries, getEntries) {
+  if (giveEntries.length === 0 && getEntries.length === 0) {
+    return {
+      give: { details: [], rawTotal: 0, scoreTotal: 0, avgDemand: 0, totalQty: 0, specialItems: [] },
+      get: { details: [], rawTotal: 0, scoreTotal: 0, avgDemand: 0, totalQty: 0, specialItems: [] },
+      ratio: 1.0,
+      valDiff: 0,
+      demandDiff: 0,
+      hasSpecial: false,
+      verdict: 'EMPTY',
+      verdictColor: 0x5865f2,
+      verdictEmoji: '⚖️',
+      verdictTitle: 'BẢNG SO KÈO TRADE (W/F/L)',
+      advice: 'Chưa có vật phẩm nào. Bấm các nút bên dưới để thêm món vào kèo trade!',
+    };
+  }
+
   const calcSide = (entries) => {
     let rawTotal = 0;
     let scoreTotal = 0;
@@ -184,16 +242,18 @@ export function evaluateTrade(giveEntries, getEntries) {
 }
 
 export function formatTradeList(side) {
-  if (!side.details.length) return '_Không có vật phẩm nào_';
+  if (!side.details.length) return '_Chưa có vật phẩm nào_';
   return side.details
     .map(({ item, qty }) => {
       const cat = CATEGORIES[item.category] ?? CATEGORIES.unit;
-      const shiny = item.isShiny ? '✨' : '';
-      const qtyStr = qty > 1 ? `\`${qty}x\` ` : '';
-      const tierStr = item.tier ? `[${item.tier}] ` : '';
-      return `${qtyStr}${shiny}${cat.emoji} **${item.name}**\n↳ Giá: \`${item.value}\` • Demand: \`${item.demand}\` • Trend: \`${item.trend}\``;
+      const shiny = item.isShiny ? '✨ ' : '';
+      const tierStr = item.tier ? `\`[${item.tier}]\` ` : '';
+      const qtyStr = qty > 1 ? `**${qty}x** ` : '';
+      const unitVal = parseNumber(item.value, 0);
+      const totalVal = unitVal > 0 && qty > 1 ? ` *(Tổng: \`${(unitVal * qty).toLocaleString()}\`)*` : '';
+      return `${cat.emoji} ${qtyStr}${shiny}**${item.name}** ${tierStr}\n↳ Giá: \`${item.value}\`${totalVal} • Demand: \`${item.demand}\` • Trend: \`${item.trend}\``;
     })
-    .join('\n');
+    .join('\n\n');
 }
 
 export function tradeEmbed(result, notFound = []) {
@@ -215,38 +275,43 @@ export function tradeEmbed(result, notFound = []) {
     },
   );
 
-  // Phân tích so sánh chi tiết
-  const analysisLines = [];
-  const diffSign = result.valDiff >= 0 ? '+' : '';
-  analysisLines.push(`• **Chênh lệch Value:** \`${diffSign}${result.valDiff.toLocaleString()}\` điểm value thuần.`);
+  if (result.give.totalQty > 0 || result.get.totalQty > 0) {
+    const analysisLines = [];
+    const diffSign = result.valDiff >= 0 ? '+' : '';
+    analysisLines.push(`• **Chênh lệch Value:** \`${diffSign}${result.valDiff.toLocaleString()}\` điểm value thuần.`);
 
-  if (result.demandDiff > 0.5) {
-    analysisLines.push(`• **Độ hot (Demand):** 🟢 Bên bạn nhận có nhu cầu cao hơn (\`+${result.demandDiff.toFixed(1)}\`), dễ trade/flip hơn.`);
-  } else if (result.demandDiff < -0.5) {
-    analysisLines.push(`• **Độ hot (Demand):** 🔴 Bên bạn nhận có nhu cầu thấp hơn (\`${result.demandDiff.toFixed(1)}\`), sẽ khó trade lại hơn.`);
+    if (result.demandDiff > 0.5) {
+      analysisLines.push(`• **Độ hot (Demand):** 🟢 Bên bạn nhận có nhu cầu cao hơn (\`+${result.demandDiff.toFixed(1)}\`), dễ trade/flip hơn.`);
+    } else if (result.demandDiff < -0.5) {
+      analysisLines.push(`• **Độ hot (Demand):** 🔴 Bên bạn nhận có nhu cầu thấp hơn (\`${result.demandDiff.toFixed(1)}\`), sẽ khó trade lại hơn.`);
+    } else {
+      analysisLines.push(`• **Độ hot (Demand):** ⚖️ Nhu cầu hai bên tương đương nhau (\`~${result.get.avgDemand.toFixed(1)}\`).`);
+    }
+
+    const droppingGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('dropping'));
+    const risingGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('rising'));
+    const overpricedGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('overpriced'));
+
+    if (risingGet.length) {
+      analysisLines.push(`• **Xu hướng tích cực:** 📈 Bên nhận có món đang tăng giá (${risingGet.map((d) => d.item.name).join(', ')}).`);
+    }
+    if (droppingGet.length) {
+      analysisLines.push(`• **Cảnh báo rớt giá:** 📉 Bên nhận có món đang tụt giá (${droppingGet.map((d) => d.item.name).join(', ')}).`);
+    }
+    if (overpricedGet.length) {
+      analysisLines.push(`• **Cảnh báo thổi giá:** ⚠️ Bên nhận có món bị định giá quá cao (${overpricedGet.map((d) => d.item.name).join(', ')}).`);
+    }
+
+    e.addFields({
+      name: '📊 Phân Tích Kèo Trade',
+      value: analysisLines.join('\n'),
+    });
   } else {
-    analysisLines.push(`• **Độ hot (Demand):** ⚖️ Nhu cầu hai bên tương đương nhau (\`~${result.get.avgDemand.toFixed(1)}\`).`);
+    e.addFields({
+      name: '🎮 Hướng Dẫn So Kèo Nhanh',
+      value: '• Bấm nút **`➕ Thêm Bạn Đưa`** để thêm món bạn muốn đưa.\n• Bấm nút **`➕ Thêm Bạn Nhận`** để thêm món bạn nhận.\n• Bấm **`✏️ Đổi số lượng`** hoặc **`🗑️ Xóa món`** để điều chỉnh bất kỳ lúc nào!',
+    });
   }
-
-  // Cảnh báo xu hướng
-  const droppingGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('dropping'));
-  const risingGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('rising'));
-  const overpricedGet = result.get.details.filter((d) => (d.item.trend || '').toLowerCase().includes('overpriced'));
-
-  if (risingGet.length) {
-    analysisLines.push(`• **Xu hướng tích cực:** 📈 Bên nhận có món đang tăng giá (${risingGet.map((d) => d.item.name).join(', ')}).`);
-  }
-  if (droppingGet.length) {
-    analysisLines.push(`• **Cảnh báo rớt giá:** 📉 Bên nhận có món đang tụt giá (${droppingGet.map((d) => d.item.name).join(', ')}).`);
-  }
-  if (overpricedGet.length) {
-    analysisLines.push(`• **Cảnh báo thổi giá:** ⚠️ Bên nhận có món bị định giá quá cao (${overpricedGet.map((d) => d.item.name).join(', ')}).`);
-  }
-
-  e.addFields({
-    name: '📊 Phân Tích Kèo Trade',
-    value: analysisLines.join('\n'),
-  });
 
   if (result.hasSpecial) {
     e.addFields({
@@ -255,14 +320,14 @@ export function tradeEmbed(result, notFound = []) {
     });
   }
 
-  if (notFound.length) {
+  if (notFound && notFound.length) {
     e.addFields({
       name: '❓ Không tìm thấy trong bảng giá',
       value: `Không nhận diện được: ${notFound.map((s) => `\`${s}\``).join(', ')}`,
     });
   }
 
-  e.setFooter({ text: 'Dựa trên AA Value List • Tự động tính toán theo Value, Demand & Trend' });
+  e.setFooter({ text: 'Dựa trên AA Value List • Bấm nút bên dưới để chỉnh sửa hoặc thêm bớt món!' });
   e.setTimestamp();
 
   return e;
@@ -284,32 +349,505 @@ export function tradeSpeech(result, lang = 'vi') {
   return t;
 }
 
-/** Autocomplete thông minh hỗ trợ gõ tiếp sau dấu phẩy/cộng và giữ số lượng (vd: "2 dark mage") */
+/** Autocomplete thông minh hỗ trợ gõ tiếp sau dấu phẩy/cộng, hỗ trợ nhiều món và giữ số lượng */
 export function handleTradeAutocomplete(input) {
-  const parts = input.split(/[,+]/);
-  const prefix = parts.slice(0, -1).map((s) => s.trim()).filter(Boolean).join(', ');
-  const rawCurrent = parts[parts.length - 1].trim();
-
-  // Tách số lượng nếu người dùng gõ số trước (vd: "2 dark mage" hoặc "2x dio")
-  let qtyPrefix = '';
-  let searchQuery = rawCurrent;
-  const qMatch = rawCurrent.match(/^(\d+\s*[*xX]?\s*)(.*)$/);
-  if (qMatch && qMatch[2]) {
-    qtyPrefix = qMatch[1].trim() + ' ';
-    searchQuery = qMatch[2].trim();
+  if (!input) {
+    const topItems = searchValues('', 10);
+    return topItems.map((it) => {
+      const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
+      const shiny = it.isShiny ? '✨ ' : '';
+      const tier = it.tier ? `[${it.tier}] ` : '';
+      const valStr = it.value !== 'N/A' && it.value !== 'Untradable' ? `Val: ${it.value}` : it.value;
+      return {
+        name: `${shiny}${cat.emoji} ${it.name} (${tier}${valStr})`.slice(0, 100),
+        value: it.name.slice(0, 100),
+      };
+    });
   }
 
-  const matches = searchValues(searchQuery, 10);
-  return matches.map((it) => {
-    const itemWithQty = `${qtyPrefix}${it.name}`;
-    const fullValue = prefix ? `${prefix}, ${itemWithQty}` : itemWithQty;
+  // 1. Dọn dẹp metadata rườm rà tránh comma trong Val: 17,000 làm vỡ câu
+  const sanitized = input
+    .replace(/\([^)]*Val:[^)]*\)/gi, '')
+    .replace(/\([^)]*Tier[^)]*\)/gi, '')
+    .replace(/\([^)]*Demand:[^)]*\)/gi, '');
+
+  const parts = sanitized.split(/[,+]/);
+  const prefixParts = parts.slice(0, -1).map((s) => cleanItemName(s)).filter(Boolean);
+  const rawCurrent = parts[parts.length - 1].trim();
+
+  // 2. Tách số lượng thông minh (hỗ trợ cả '6 aizen' lẫn 'aizen 6' hoặc '6x aizen')
+  let qtyPrefix = '';
+  let searchQuery = rawCurrent;
+  const startMatch = rawCurrent.match(/^(\d+\s*[*xX]?\s*)(.*)$/);
+  const endMatch = rawCurrent.match(/^(.*?)\s*[*xX]?\s*(\d+)$/);
+
+  if (startMatch && startMatch[2]) {
+    qtyPrefix = startMatch[1].trim() + ' ';
+    searchQuery = startMatch[2].trim();
+  } else if (endMatch && endMatch[1] && isNaN(endMatch[1])) {
+    qtyPrefix = endMatch[2].trim() + ' ';
+    searchQuery = endMatch[1].trim();
+  }
+
+  // 3. Rút gọn prefix nếu dài để không bao giờ vượt trần 100 ký tự Discord
+  let prefix = prefixParts.join(', ');
+  if (prefix.length > 45) {
+    prefix = prefixParts
+      .map((p) => {
+        const m = p.match(/^(\d+\s*[*xX]?\s*)(.*)$/);
+        const q = m ? m[1] : '';
+        const n = m ? m[2] : p;
+        return (q + shortenItemName(n)).trim();
+      })
+      .join(', ');
+  }
+
+  const matches = searchValues(searchQuery, 15);
+  const seen = new Set();
+  const choices = [];
+
+  for (const it of matches) {
+    const itemWithQty = (qtyPrefix + it.name).trim();
+    let fullVal = prefix ? `${prefix}, ${itemWithQty}` : itemWithQty;
+
+    // Nếu sắp chạm giới hạn 100 ký tự Discord, rút gọn tên item hiện tại
+    if (fullVal.length > 95) {
+      const shortWithQty = (qtyPrefix + shortenItemName(it.name)).trim();
+      fullVal = prefix ? `${prefix}, ${shortWithQty}` : shortWithQty;
+    }
+    if (fullVal.length > 100) {
+      fullVal = fullVal.slice(0, 100);
+    }
+
+    if (seen.has(fullVal)) continue;
+    seen.add(fullVal);
+
     const cat = CATEGORIES[it.category] ?? CATEGORIES.unit;
-    const shiny = it.isShiny ? '✨' : '';
+    const shiny = it.isShiny ? '✨ ' : '';
     const tier = it.tier ? `[${it.tier}] ` : '';
-    return {
-      name: `${fullValue} (${shiny}${cat.emoji} ${tier}Val: ${it.value})`.slice(0, 100),
-      value: fullValue.slice(0, 100),
-    };
-  });
+    const valStr = it.value !== 'N/A' && it.value !== 'Untradable' ? `Val: ${it.value}` : it.value;
+    const displayQty = qtyPrefix ? `${qtyPrefix.trim()} ` : '';
+
+    const label = `${shiny}${cat.emoji} ${displayQty}${it.name} (${tier}${valStr})`.slice(0, 100);
+
+    choices.push({ name: label, value: fullVal });
+    if (choices.length >= 10) break;
+  }
+
+  return choices;
 }
 
+/** Tạo thanh nút bấm tương tác cho kèo trade */
+export function tradeActionRow(tid) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`trade_add_give:${tid}`)
+      .setLabel('➕ Thêm Bạn Đưa')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`trade_add_get:${tid}`)
+      .setLabel('➕ Thêm Bạn Nhận')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`trade_edit_qty:${tid}`)
+      .setLabel('✏️ Đổi số lượng')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`trade_remove:${tid}`)
+      .setLabel('🗑️ Xóa món')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`trade_flip:${tid}`)
+      .setLabel('🔄 Đảo 2 bên')
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+/** Tự động phục hồi session trade nếu bot bị restart */
+function recoverSessionFromMessage(message, tid, userId) {
+  const embed = message.embeds?.[0];
+  if (!embed || !embed.fields || embed.fields.length < 2) return null;
+
+  const giveField = embed.fields[0]?.value || '';
+  const getField = embed.fields[1]?.value || '';
+
+  const giveParsed = parseTradeItems(giveField);
+  const getParsed = parseTradeItems(getField);
+
+  const session = {
+    messageId: message.id,
+    channelId: message.channelId,
+    guildId: message.guildId,
+    userId: userId || 'unknown',
+    give: giveParsed.items,
+    get: getParsed.items,
+    notFound: [],
+    lastUpdated: Date.now(),
+  };
+
+  tradeSessions.set(tid, session);
+  return session;
+}
+
+/** Cập nhật tin nhắn gốc sau khi thêm/sửa/xóa món */
+async function updateTradeMessage(client, session, tid, result, interaction = null) {
+  const embed = tradeEmbed(result, session.notFound);
+  const row = tradeActionRow(tid);
+
+  if (interaction && typeof interaction.update === 'function' && interaction.message?.id === session.messageId) {
+    return await interaction.update({ embeds: [embed], components: [row] });
+  }
+
+  try {
+    const channel = client.channels.cache.get(session.channelId) || (await client.channels.fetch(session.channelId));
+    if (channel && session.messageId) {
+      const msg = await channel.messages.fetch(session.messageId);
+      if (msg) {
+        await msg.edit({ embeds: [embed], components: [row] });
+        if (interaction && !interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '✅ Đã cập nhật kèo trade thành công!', flags: MessageFlags.Ephemeral });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[trade] Lỗi updateTradeMessage:', e.message);
+    if (interaction && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
+    }
+  }
+}
+
+/** Xử lý khi bấm nút tương tác trong kèo trade */
+export async function handleTradeButton(i) {
+  const customId = i.customId;
+  if (!customId.startsWith('trade_')) return false;
+
+  const [action, tid] = customId.split(':');
+  let session = tradeSessions.get(tid);
+
+  if (!session && i.message?.embeds?.[0]) {
+    session = recoverSessionFromMessage(i.message, tid, i.user.id);
+  }
+
+  if (!session) {
+    await i.reply({
+      content: '⚠️ Kèo trade này đã hết phiên tương tác. Hãy dùng lệnh `/wfl` để tạo kèo mới!',
+      flags: MessageFlags.Ephemeral,
+    });
+    return true;
+  }
+
+  // 1. Thêm món bạn đưa
+  if (action === 'trade_add_give') {
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_add_give:${tid}`)
+      .setTitle('➕ Thêm món vào BẠN ĐƯA')
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('item_name')
+            .setLabel('Tên vật phẩm')
+            .setPlaceholder('vd: aizen, alucard, summer 1, sss dmg...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true),
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('item_qty')
+            .setLabel('Số lượng')
+            .setValue('1')
+            .setPlaceholder('vd: 1, 2, 4, 10...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false),
+        ),
+      );
+    await i.showModal(modal);
+    return true;
+  }
+
+  // 2. Thêm món bạn nhận
+  if (action === 'trade_add_get') {
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_add_get:${tid}`)
+      .setTitle('➕ Thêm món vào BẠN NHẬN')
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('item_name')
+            .setLabel('Tên vật phẩm')
+            .setPlaceholder('vd: dio, dracula, battle pass, sss spa...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true),
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('item_qty')
+            .setLabel('Số lượng')
+            .setValue('1')
+            .setPlaceholder('vd: 1, 2, 4, 10...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false),
+        ),
+      );
+    await i.showModal(modal);
+    return true;
+  }
+
+  // 3. Đổi số lượng
+  if (action === 'trade_edit_qty') {
+    const allItems = [
+      ...session.give.map((e, idx) => ({ ...e, side: 'give', idx })),
+      ...session.get.map((e, idx) => ({ ...e, side: 'get', idx })),
+    ];
+
+    if (!allItems.length) {
+      await i.reply({
+        content: '❌ Kèo trade hiện tại chưa có món nào để chỉnh sửa số lượng!',
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+
+    const options = allItems.map(({ item, qty, side, idx }) => {
+      const sideLabel = side === 'give' ? '📤 Bạn Đưa' : '📥 Bạn Nhận';
+      const unitVal = parseNumber(item.value, 0);
+      const totalValStr = unitVal > 0 ? ` • Tổng Val: ${(unitVal * qty).toLocaleString()}` : '';
+      return {
+        label: `[${sideLabel}] ${qty}x ${shortenItemName(item.name)}`.slice(0, 100),
+        description: `Giá gốc: ${item.value}${totalValStr}`.slice(0, 100),
+        value: `${side}_${idx}`,
+      };
+    });
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`select_edit_item:${tid}`)
+      .setPlaceholder('Chọn món bạn muốn thay đổi số lượng...')
+      .addOptions(options.slice(0, 25));
+
+    await i.reply({
+      content: '✏️ **Chọn món bạn muốn chỉnh sửa số lượng:**',
+      components: [new ActionRowBuilder().addComponents(menu)],
+      flags: MessageFlags.Ephemeral,
+    });
+    return true;
+  }
+
+  // 4. Xóa món
+  if (action === 'trade_remove') {
+    const allItems = [
+      ...session.give.map((e, idx) => ({ ...e, side: 'give', idx })),
+      ...session.get.map((e, idx) => ({ ...e, side: 'get', idx })),
+    ];
+
+    if (!allItems.length) {
+      await i.reply({
+        content: '❌ Kèo trade chưa có món nào để xóa!',
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+
+    const options = allItems.map(({ item, qty, side, idx }) => {
+      const sideLabel = side === 'give' ? '📤 Bạn Đưa' : '📥 Bạn Nhận';
+      return {
+        label: `[${sideLabel}] ${qty}x ${shortenItemName(item.name)}`.slice(0, 100),
+        description: `Giá: ${item.value} • Bấm để xóa món này`.slice(0, 100),
+        value: `${side}_${idx}`,
+      };
+    });
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`select_remove_item:${tid}`)
+      .setPlaceholder('Chọn món bạn muốn xóa khỏi kèo...')
+      .addOptions(options.slice(0, 25));
+
+    await i.reply({
+      content: '🗑️ **Chọn món bạn muốn xóa:**',
+      components: [new ActionRowBuilder().addComponents(menu)],
+      flags: MessageFlags.Ephemeral,
+    });
+    return true;
+  }
+
+  // 5. Đảo 2 bên
+  if (action === 'trade_flip') {
+    const tmp = session.give;
+    session.give = session.get;
+    session.get = tmp;
+    session.lastUpdated = Date.now();
+
+    const result = evaluateTrade(session.give, session.get);
+    await i.update({
+      embeds: [tradeEmbed(result, session.notFound)],
+      components: [tradeActionRow(tid)],
+    });
+    return true;
+  }
+
+  return false;
+}
+
+/** Xử lý Select Menu chọn món để sửa số lượng hoặc xóa */
+export async function handleTradeSelectMenu(i) {
+  const customId = i.customId;
+  if (!customId.startsWith('select_edit_item:') && !customId.startsWith('select_remove_item:')) {
+    return false;
+  }
+
+  const [action, tid] = customId.split(':');
+  let session = tradeSessions.get(tid);
+  if (!session && i.message) {
+    session = recoverSessionFromMessage(i.message, tid, i.user.id);
+  }
+  if (!session) {
+    await i.reply({
+      content: '⚠️ Hết phiên tương tác, vui lòng dùng lại lệnh `/wfl`!',
+      flags: MessageFlags.Ephemeral,
+    });
+    return true;
+  }
+
+  const selected = i.values[0]; // 'give_0' or 'get_1'
+  const [side, idxStr] = selected.split('_');
+  const idx = parseInt(idxStr, 10);
+  const entry = session[side]?.[idx];
+
+  if (!entry) {
+    await i.reply({ content: '❌ Vật phẩm này không còn tồn tại.', flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  if (action === 'select_edit_item') {
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_set_qty:${tid}:${side}:${idx}`)
+      .setTitle(`Đổi SL: ${shortenItemName(entry.item.name)}`.slice(0, 45))
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('new_qty')
+            .setLabel(`Số lượng mới (hiện tại: ${entry.qty})`.slice(0, 45))
+            .setValue(String(entry.qty))
+            .setPlaceholder('Nhập số lượng mới (gõ 0 để xóa)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true),
+        ),
+      );
+    await i.showModal(modal);
+    return true;
+  }
+
+  if (action === 'select_remove_item') {
+    const removed = session[side].splice(idx, 1)[0];
+    session.lastUpdated = Date.now();
+
+    const result = evaluateTrade(session.give, session.get);
+    await updateTradeMessage(i.client, session, tid, result);
+
+    await i.update({
+      content: `✅ Đã xóa món **${removed?.item?.name}** khỏi kèo trade!`,
+      components: [],
+    });
+    return true;
+  }
+
+  return false;
+}
+
+/** Xử lý khi submit Modal nhập món hoặc đổi số lượng */
+export async function handleTradeModalSubmit(i) {
+  const customId = i.customId;
+  if (
+    !customId.startsWith('modal_add_give:') &&
+    !customId.startsWith('modal_add_get:') &&
+    !customId.startsWith('modal_set_qty:')
+  ) {
+    return false;
+  }
+
+  // 1. Thêm món qua Modal
+  if (customId.startsWith('modal_add_give:') || customId.startsWith('modal_add_get:')) {
+    const isGive = customId.startsWith('modal_add_give:');
+    const side = isGive ? 'give' : 'get';
+    const tid = customId.split(':')[1];
+
+    let session = tradeSessions.get(tid);
+    if (!session && i.message) {
+      session = recoverSessionFromMessage(i.message, tid, i.user.id);
+    }
+    if (!session) {
+      await i.reply({
+        content: '⚠️ Hết phiên tương tác, hãy dùng `/wfl` để tạo kèo mới!',
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+
+    const itemName = i.fields.getTextInputValue('item_name').trim();
+    const qtyStr = i.fields.getTextInputValue('item_qty').trim();
+    let qty = parseInt(qtyStr, 10);
+    if (isNaN(qty) || qty < 1) qty = 1;
+
+    const parsed = parseTradeItems(`${qty}x ${itemName}`);
+    if (!parsed.items.length) {
+      await i.reply({
+        content: `❌ Không tìm thấy vật phẩm nào khớp với: \`${itemName}\`!\n💡 *Mẹo: Bạn có thể gõ tên ngắn như "aizen", "dracula", "dio", "summer 1", "sss dmg"...*`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+
+    for (const added of parsed.items) {
+      const existing = session[side].find((e) => e.item.key === added.item.key);
+      if (existing) existing.qty += added.qty;
+      else session[side].push(added);
+    }
+    session.lastUpdated = Date.now();
+
+    const result = evaluateTrade(session.give, session.get);
+    await updateTradeMessage(i.client, session, tid, result, i);
+    return true;
+  }
+
+  // 2. Sửa số lượng qua Modal
+  if (customId.startsWith('modal_set_qty:')) {
+    const [, tid, side, idxStr] = customId.split(':');
+    const idx = parseInt(idxStr, 10);
+
+    let session = tradeSessions.get(tid);
+    if (!session && i.message) {
+      session = recoverSessionFromMessage(i.message, tid, i.user.id);
+    }
+    if (!session) {
+      await i.reply({
+        content: '⚠️ Hết phiên tương tác, hãy dùng `/wfl` để tạo kèo mới!',
+        flags: MessageFlags.Ephemeral,
+      });
+      return true;
+    }
+
+    const newQtyStr = i.fields.getTextInputValue('new_qty').trim();
+    const newQty = parseInt(newQtyStr, 10);
+    if (isNaN(newQty) || newQty < 0) {
+      await i.reply({ content: '❌ Số lượng không hợp lệ!', flags: MessageFlags.Ephemeral });
+      return true;
+    }
+
+    if (newQty === 0) {
+      session[side].splice(idx, 1);
+    } else {
+      if (session[side][idx]) session[side][idx].qty = newQty;
+    }
+    session.lastUpdated = Date.now();
+
+    const result = evaluateTrade(session.give, session.get);
+    await updateTradeMessage(i.client, session, tid, result);
+
+    await i.update({
+      content: `✅ Đã cập nhật số lượng thành công!`,
+      components: [],
+    });
+    return true;
+  }
+
+  return false;
+}

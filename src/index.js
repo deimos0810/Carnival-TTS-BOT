@@ -28,6 +28,11 @@ import {
   tradeEmbed,
   tradeSpeech,
   handleTradeAutocomplete,
+  tradeActionRow,
+  tradeSessions,
+  handleTradeButton,
+  handleTradeSelectMenu,
+  handleTradeModalSubmit,
 } from './trade.js';
 
 if (!process.env.DISCORD_TOKEN) {
@@ -174,6 +179,9 @@ client.on(Events.VoiceStateUpdate, (oldState) => {
 client.on(Events.InteractionCreate, async (i) => {
   try {
     if (i.isAutocomplete()) return await handleAutocomplete(i);
+    if (i.isButton()) return await handleTradeButton(i);
+    if (i.isStringSelectMenu()) return await handleTradeSelectMenu(i);
+    if (i.isModalSubmit()) return await handleTradeModalSubmit(i);
     if (!i.isChatInputCommand() || !i.inGuild()) return;
     const cfg = getGuild(i.guildId);
     const member = i.member;
@@ -607,24 +615,35 @@ async function handleTradeCommand(i, member) {
 
   const notFound = [...giveParsed.notFound, ...getParsed.notFound];
 
-  if (!giveParsed.items.length && !getParsed.items.length) {
-    return i.reply({
-      content: `❌ Không tìm thấy item hợp lệ nào trong kèo trade!\nKhông nhận diện được: ${notFound.map((s) => `\`${s}\``).join(', ')}`,
-      flags: ephemeral,
-    });
-  }
-
+  const tid = Math.random().toString(36).slice(2, 9);
   const result = evaluateTrade(giveParsed.items, getParsed.items);
-  await i.reply({ embeds: [tradeEmbed(result, notFound)] });
+  const embed = tradeEmbed(result, notFound);
+  const row = tradeActionRow(tid);
 
-  if (i.options.getBoolean('speak')) {
+  const replyMsg = await i.reply({
+    embeds: [embed],
+    components: [row],
+    fetchReply: true,
+  });
+
+  tradeSessions.set(tid, {
+    messageId: replyMsg.id,
+    channelId: i.channelId,
+    guildId: i.guildId,
+    userId: i.user.id,
+    give: giveParsed.items,
+    get: getParsed.items,
+    notFound,
+    lastUpdated: Date.now(),
+  });
+
+  if (i.options.getBoolean('speak') && (giveParsed.items.length || getParsed.items.length)) {
     const vc = member.voice.channel;
-    if (!vc) {
-      return i.followUp({ content: '⚠️ Bạn hãy vào phòng voice để bot đọc kết quả trade.', flags: ephemeral });
+    if (vc) {
+      const s = await joinChannel(vc);
+      const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
+      s.enqueue(tradeSpeech(result, lang), lang);
     }
-    const s = await joinChannel(vc);
-    const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
-    s.enqueue(tradeSpeech(result, lang), lang);
   }
 }
 
