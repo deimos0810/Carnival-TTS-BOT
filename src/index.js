@@ -34,6 +34,13 @@ import {
   handleTradeSelectMenu,
   handleTradeModalSubmit,
 } from './trade.js';
+import {
+  fetchRobloxVersions,
+  buildRobloxEmbed,
+  sendRobloxNotification,
+  checkRobloxUpdate,
+  ROBLOX_ICON_URL,
+} from './roblox.js';
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('Thiếu DISCORD_TOKEN trong biến môi trường!');
@@ -57,6 +64,7 @@ startServer(() => ({
   engine: engineName(),
   items: Object.keys(state.values || {}).length,
   lastSync: state.lastSync,
+  robloxVersion: state.roblox?.lastWindowsVersion ?? null,
 }));
 
 // ---------------- Helpers ----------------
@@ -113,6 +121,14 @@ client.once(Events.ClientReady, async (c) => {
       .then((n) => console.log(`[values] [Auto-Sync] Cập nhật thành công ${n} items từ Google Sheet!`))
       .catch((e) => console.warn('[values] [Auto-Sync] Lỗi:', e.message));
   }, 30 * 60 * 1000);
+
+  // Khởi động trình theo dõi phiên bản Roblox PC Windows (WEAO API)
+  checkRobloxUpdate(c).catch((e) => console.warn('[roblox] Lỗi kiểm tra lúc khởi động:', e.message));
+
+  // Tự động kiểm tra bản cập nhật Roblox mỗi 3 phút
+  setInterval(() => {
+    checkRobloxUpdate(client).catch((e) => console.warn('[roblox] Lỗi tự động kiểm tra:', e.message));
+  }, 3 * 60 * 1000);
 });
 
 // Tự động đăng ký slash command ngay khi bot được mời vào server mới
@@ -230,6 +246,8 @@ client.on(Events.InteractionCreate, async (i) => {
         return await handleValue(i, member);
       case 'wfl':
         return await handleTradeCommand(i, member);
+      case 'roblox':
+        return await handleRobloxCommand(i, cfg, member);
     }
   } catch (e) {
     console.error('[cmd] Lỗi:', e);
@@ -643,6 +661,156 @@ async function handleTradeCommand(i, member) {
       const s = await joinChannel(vc);
       const lang = i.options.getString('lang') ?? (getUser(i.user.id).lang === 'en' ? 'en' : 'vi');
       s.enqueue(tradeSpeech(result, lang), lang);
+    }
+  }
+}
+
+async function handleRobloxCommand(i, cfg, member) {
+  const sub = i.options.getSubcommand();
+
+  switch (sub) {
+    case 'channel': {
+      if (!isAdmin(member) && !isOwner(i.user.id)) {
+        return i.reply({
+          content: '❌ Bạn cần quyền **Quản lý Server** (Manage Server) để thiết lập kênh thông báo.',
+          flags: ephemeral,
+        });
+      }
+
+      const channel = i.options.getChannel('channel');
+      const botPerms = channel.permissionsFor(i.guild.members.me);
+      if (
+        !botPerms ||
+        !botPerms.has([
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.EmbedLinks,
+        ])
+      ) {
+        return i.reply({
+          content: `⚠️ Bot thiếu quyền tại kênh ${channel}! Vui lòng đảm bảo bot có các quyền: **Xem kênh**, **Gửi tin nhắn** và **Nhúng liên kết (Embed Links)**.`,
+          flags: ephemeral,
+        });
+      }
+
+      cfg.robloxChannelId = channel.id;
+      await flushNow();
+
+      return i.reply({
+        content: `✅ Đã thiết lập kênh thông báo tự động cập nhật Roblox PC (Windows) tại ${channel}!\n• Khi Roblox có phiên bản Windows mới, bot sẽ tự động gửi thông báo chi tiết vào kênh này.\n• Dùng \`/roblox role\` để cài đặt role được ping khi có update.\n• Dùng \`/roblox test\` để gửi thử thông báo mẫu kiểm tra hiển thị.`,
+      });
+    }
+
+    case 'removechannel': {
+      if (!isAdmin(member) && !isOwner(i.user.id)) {
+        return i.reply({
+          content: '❌ Bạn cần quyền **Quản lý Server** để tắt kênh thông báo.',
+          flags: ephemeral,
+        });
+      }
+
+      cfg.robloxChannelId = null;
+      cfg.robloxRolePingId = null;
+      await flushNow();
+
+      return i.reply({
+        content: '🗑️ Đã tắt tự động thông báo cập nhật Roblox PC trên server này.',
+      });
+    }
+
+    case 'role': {
+      if (!isAdmin(member) && !isOwner(i.user.id)) {
+        return i.reply({
+          content: '❌ Bạn cần quyền **Quản lý Server** để cài đặt role ping.',
+          flags: ephemeral,
+        });
+      }
+
+      const role = i.options.getRole('role');
+      if (role) {
+        cfg.robloxRolePingId = role.id;
+        await flushNow();
+        return i.reply({
+          content: `🔔 Khi có bản cập nhật Roblox Windows mới, bot sẽ ping role ${role}.`,
+        });
+      } else {
+        cfg.robloxRolePingId = null;
+        await flushNow();
+        return i.reply({
+          content: '🔕 Đã tắt tính năng ping role khi có bản cập nhật Roblox mới.',
+        });
+      }
+    }
+
+    case 'check': {
+      await i.deferReply();
+      const { current, past, error } = await fetchRobloxVersions();
+      if (error || !current?.Windows) {
+        return i.editReply(`❌ Không thể kết nối tới WEAO API: ${error || 'Không nhận được dữ liệu'}`);
+      }
+      const payload = buildRobloxEmbed({ current, past, isUpdate: false });
+      return i.editReply(payload);
+    }
+
+    case 'test': {
+      if (!isAdmin(member) && !isOwner(i.user.id)) {
+        return i.reply({
+          content: '❌ Bạn cần quyền **Quản lý Server** để gửi tin nhắn test.',
+          flags: ephemeral,
+        });
+      }
+
+      if (!cfg.robloxChannelId) {
+        return i.reply({
+          content: '❌ Server này chưa cài đặt kênh thông báo! Hãy dùng lệnh `/roblox channel` trước.',
+          flags: ephemeral,
+        });
+      }
+
+      await i.deferReply({ flags: ephemeral });
+      const { current, past, error } = await fetchRobloxVersions();
+      if (error || !current?.Windows) {
+        return i.editReply(`❌ Không thể kết nối tới WEAO API: ${error || 'Lỗi dữ liệu'}`);
+      }
+
+      const sent = await sendRobloxNotification(client, {
+        current,
+        past,
+        isUpdate: false,
+        isTest: true,
+        targetGuildId: i.guildId,
+      });
+
+      if (sent > 0) {
+        return i.editReply(`✅ Đã gửi thông báo kiểm tra mẫu thành công vào kênh <#${cfg.robloxChannelId}>!`);
+      } else {
+        return i.editReply(`⚠️ Không thể gửi tin nhắn vào kênh <#${cfg.robloxChannelId}>. Vui lòng kiểm tra lại quyền hạn của bot trong kênh đó.`);
+      }
+    }
+
+    case 'settings': {
+      const channelText = cfg.robloxChannelId ? `<#${cfg.robloxChannelId}>` : '*(Chưa cài đặt - dùng `/roblox channel`)*';
+      const roleText = cfg.robloxRolePingId ? `<@&${cfg.robloxRolePingId}>` : '*(Không ping role)*';
+      const lastVer = state.roblox?.lastWindowsVersion || 'Chưa có dữ liệu';
+      const lastCheck = state.roblox?.lastCheck
+        ? `<t:${Math.floor(state.roblox.lastCheck / 1000)}:R>`
+        : 'Chưa có dữ liệu';
+
+      const embed = new EmbedBuilder()
+        .setTitle('⚙️ Cấu Hình Thông Báo Roblox PC (Windows)')
+        .setColor(0x00a2ff)
+        .setThumbnail(ROBLOX_ICON_URL)
+        .setDescription('Hệ thống theo dõi tự động phiên bản Roblox PC thông qua WEAO API.')
+        .addFields(
+          { name: '📢 Kênh nhận thông báo', value: channelText, inline: true },
+          { name: '🔔 Role được ping', value: roleText, inline: true },
+          { name: '⏱️ Tần suất kiểm tra', value: 'Tự động mỗi 3 phút', inline: true },
+          { name: '🖥️ Phiên bản Windows hiện tại', value: `\`${lastVer}\``, inline: false },
+          { name: '🕒 Lần kiểm tra gần nhất', value: lastCheck, inline: true },
+        )
+        .setFooter({ text: 'Dùng /roblox check để kiểm tra phiên bản mới nhất ngay lập tức' });
+
+      return i.reply({ embeds: [embed] });
     }
   }
 }

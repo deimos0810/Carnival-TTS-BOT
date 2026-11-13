@@ -4,7 +4,18 @@ import path from 'node:path';
 const DATA_FILE = process.env.DATA_FILE || path.resolve('data/state.json');
 const SEED_FILE = path.resolve('data/values.seed.json');
 
-const defaultState = () => ({ guilds: {}, users: {}, values: {}, lastSync: null });
+const defaultState = () => ({
+  guilds: {},
+  users: {},
+  values: {},
+  lastSync: null,
+  roblox: {
+    lastWindowsVersion: null,
+    lastWindowsDate: null,
+    lastUpdated: null,
+    lastCheck: null,
+  },
+});
 
 export let state = defaultState();
 let mongoCol = null;
@@ -54,6 +65,11 @@ export async function initStore() {
     state = localState;
     console.log(`[store] Dùng file cục bộ ${DATA_FILE} (${Object.keys(state.guilds).length} servers)`);
   }
+
+  state.roblox = {
+    ...defaultState().roblox,
+    ...(state.roblox || {}),
+  };
 
   // Nạp seed data nếu kho values chưa có gì
   if (!state.values || Object.keys(state.values).length === 0) {
@@ -120,6 +136,8 @@ export function getGuild(id) {
   g.maxLength ??= 300;
   g.voiceId ??= null; // ID giọng đọc riêng của server
   g.dict ??= {}; // từ điển phát âm riêng: { word: { say, lang } }
+  g.robloxChannelId ??= null; // ID kênh thông báo cập nhật Roblox PC
+  g.robloxRolePingId ??= null; // Role ping khi có cập nhật Roblox
   return g;
 }
 

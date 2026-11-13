@@ -1,15 +1,37 @@
-# 🎪 Carnival TTS & AA Value List Bot
+# 🎪 Carnival TTS, AA Value List & Roblox Update Tracker Bot
 
 Bot Discord đa năng kết hợp:
 1. **Text-to-Speech (TTS):** Đọc tin nhắn bằng giọng **Tiếng Việt** và **English**, **chỉ đọc những ai có role được phân quyền**.
 2. **AA Value List (Tra cứu bảng giá Unit & Gamepass):** Tự động đồng bộ trực tiếp từ [Google Spreadsheet chính thức](https://docs.google.com/spreadsheets/d/1KTVAqVw26TkwJF7GGJmKjkVEXCK5itqS1OZAIpqxuJ0) (chia rõ Gamepass, Unit Tier S/A/B/C, Shiny, Unobtainable, Skins, Relics). Tự động cập nhật mỗi 30 phút một lần và có tính năng đọc giá to trong voice.
-3. **Hoạt động 24/7:** Chạy Web Service miễn phí trên **Render** kết hợp **UptimeRobot** ping `/health` giữ bot luôn thức.
+3. **Roblox PC Windows Update Tracker (WEAO API):** Tự động phát hiện và gửi thông báo vào kênh riêng khi client Roblox PC Windows có bản cập nhật mới, kèm link tải trực tiếp qua RDD và downgrade link.
+4. **Hoạt động 24/7:** Chạy Web Service miễn phí trên **Render** kết hợp **UptimeRobot** ping `/health` giữ bot luôn thức.
 
 ---
 
 ## ⚡ Bảng lệnh Slash Command
 
-### 1. Nhóm Lệnh Tra Cứu & So Sánh Kèo Trade (`/wfl`, `/value`)
+### 1. Nhóm Lệnh Theo Dõi Cập Nhật Roblox PC (`/roblox`)
+
+Dựa trên hệ thống **WEAO API** ([docs.weao.xyz](https://docs.weao.xyz/)), bot tự động theo dõi phiên bản Roblox PC Windows mỗi 3 phút. Khi phát hiện Roblox vừa đẩy bản cập nhật mới lên máy chủ Live, bot sẽ ngay lập tức gửi thông báo embed tuyệt đẹp vào kênh Discord bạn đã cài đặt!
+
+| Lệnh | Phân quyền | Mô tả |
+|---|---|---|
+| `/roblox channel <channel>` | Admin | **Cài đặt kênh Discord riêng** để tự động nhận thông báo mỗi khi Roblox PC Windows có bản cập nhật mới. |
+| `/roblox removechannel` | Admin | Hủy theo dõi và tắt tự động gửi thông báo cập nhật Roblox trên server này. |
+| `/roblox role [role]` | Admin | Cài đặt role sẽ được ping khi có update Roblox mới (để trống để tắt ping role). |
+| `/roblox check` | Mọi người | **Kiểm tra ngay lập tức** phiên bản Roblox PC Windows hiện tại trên WEAO API (kèm số hiệu bản dựng, ngày phát hành và link tải). |
+| `/roblox test` | Admin | Gửi thử 1 thông báo cập nhật mẫu vào kênh đã cài đặt để kiểm tra quyền hạn của bot và cách hiển thị. |
+| `/roblox settings` | Mọi người | Xem cấu hình kênh thông báo, role ping và phiên bản Roblox ghi nhận gần nhất. |
+
+> 🛠️ **Tính năng nổi bật của Roblox Tracker:**
+> - Tuân thủ chuẩn User-Agent `WEAO-3PService` theo tài liệu chính thức của WEAO API.
+> - Cung cấp link tải trực tiếp phiên bản mới qua **RDD (Roblox Deployment Downloader)**.
+> - Cung cấp link tải phiên bản cũ (Downgrade) phục vụ cho việc nghiên cứu, modding hoặc chạy executor tương thích.
+> - Hiển thị timestamp phát hành dạng Discord Dynamic Time (`<t:timestamp:R>`) tự đếm lùi thời gian.
+
+---
+
+### 2. Nhóm Lệnh Tra Cứu & So Sánh Kèo Trade (`/wfl`, `/value`)
 
 | Lệnh | Phân quyền | Mô tả |
 |---|---|---|

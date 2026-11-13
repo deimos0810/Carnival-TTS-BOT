@@ -266,5 +266,48 @@ const wfl = addTradeOptions(
     .setDescription('So sánh kèo trade Win / Fair / Loss (Unit, Gamepass, Stats, Skin)'),
 );
 
-export const commandData = [tts, join, leave, skip, say, value, wfl].map((c) => c.toJSON());
+// --- Roblox Tracker Commands (WEAO API) ---
+const roblox = new SlashCommandBuilder()
+  .setName('roblox')
+  .setDescription('Theo dõi và tự động thông báo cập nhật Roblox PC Windows (WEAO API)')
+  .addSubcommand((s) =>
+    s
+      .setName('channel')
+      .setDescription('[Admin] Cài đặt kênh nhận thông báo tự động cập nhật Roblox PC')
+      .addChannelOption((o) =>
+        o
+          .setName('channel')
+          .setDescription('Kênh văn bản nhận thông báo')
+          .setRequired(true)
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
+      ),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('removechannel')
+      .setDescription('[Admin] Tắt thông báo tự động cập nhật Roblox trên server này'),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('role')
+      .setDescription('[Admin] Cài đặt role sẽ được ping khi có bản update mới (để trống để bỏ ping)')
+      .addRoleOption((o) => o.setName('role').setDescription('Role cần ping').setRequired(false)),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('check')
+      .setDescription('Kiểm tra ngay phiên bản Roblox PC Windows hiện tại trên WEAO API'),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('test')
+      .setDescription('[Admin] Gửi thử thông báo mẫu vào kênh đã cài để kiểm tra quyền và hiển thị'),
+  )
+  .addSubcommand((s) =>
+    s
+      .setName('settings')
+      .setDescription('Xem thông tin cấu hình kênh thông báo Roblox của server'),
+  );
+
+export const commandData = [tts, join, leave, skip, say, value, wfl, roblox].map((c) => c.toJSON());
 export { PermissionFlagsBits };
